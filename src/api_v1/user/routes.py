@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api_v1.auth.crud import get_current_active_user
 from src.api_v1.user.schemas import ProfileResponse, ProfileUpdate, RoommateResponse
 from src.core.database import User, postgres_helper
+from src.core.database.alchemy_models.match import Match
 
 users_router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -24,7 +25,6 @@ async def update_my_profile(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    # Update user profile
     for key, value in profile.model_dump(exclude_unset=True).items():
         setattr(current_user, key, value)
 
@@ -39,13 +39,7 @@ async def get_potential_roommates(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    # Get users who could be potential roommates
-    # Excluding the current user and users that have already been matched
 
-    # First, get all matches for the current user
-    from src.core.database.alchemy_models.match import Match
-
-    # Get IDs of users who are already matched with the current user
     query = select(Match).where(
         ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
     )
@@ -59,7 +53,6 @@ async def get_potential_roommates(
         else:
             matched_user_ids.append(match.user1_id)
 
-    # Get potential roommates (excluding current user and matched users)
     query = select(User).where(
         (User.id != current_user.id) &
         (~User.id.in_(matched_user_ids))

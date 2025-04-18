@@ -1,6 +1,4 @@
 from datetime import datetime
-from typing import List
-
 from pydantic import BaseModel, ConfigDict
 
 from src.api_v1.user.schemas import RoommateResponse

@@ -19,17 +19,13 @@ async def get_ai_matches(
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
         limit: int = Query(10, ge=1, le=50),
 ):
-    """
-    Get AI-recommended roommate matches based on compatibility analysis.
-    """
-    # Ensure current user has a complete profile
+
     if not current_user.name or not current_user.bio or not current_user.interests:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Please complete your profile to get AI matches",
         )
 
-    # Get already matched users
     query = select(Match).where(
         ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
     )
@@ -43,7 +39,6 @@ async def get_ai_matches(
         else:
             matched_user_ids.append(match.user1_id)
 
-    # Get potential roommates (excluding current user and matched users)
     query = select(User).where(
         (User.id != current_user.id) &
         (~User.id.in_(matched_user_ids))
@@ -51,14 +46,12 @@ async def get_ai_matches(
     result = await session.execute(query)
     potential_matches = result.scalars().all()
 
-    # Use AI matching service to get top matches
     ai_matches = ai_matching_service.get_top_matches(
         current_user=current_user,
         potential_matches=potential_matches,
         limit=limit
     )
 
-    # Format response
     matches_response = AIMatchesResponse(
         matches=[
             AIMatchResponse(
@@ -79,10 +72,6 @@ async def get_compatibility_score(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    """
-    Calculate compatibility score between current user and specified user.
-    """
-    # Check if user exists
     query = select(User).where(User.id == user_id)
     result = await session.execute(query)
     other_user = result.scalar_one_or_none()
@@ -93,7 +82,6 @@ async def get_compatibility_score(
             detail="User not found",
         )
 
-    # Calculate compatibility score
     score, explanation = ai_matching_service.calculate_compatibility_score(
         current_user, other_user
     )

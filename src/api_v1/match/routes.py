@@ -19,7 +19,6 @@ async def create_match(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    # Check if roommate exists
     query = select(User).where(User.id == roommate_id)
     result = await session.execute(query)
     roommate = result.scalar_one_or_none()
@@ -30,7 +29,6 @@ async def create_match(
             detail="Roommate not found",
         )
 
-    # Check if match already exists
     query = select(Match).where(
         (
                 (Match.user1_id == current_user.id) & (Match.user2_id == roommate_id) |
@@ -43,7 +41,6 @@ async def create_match(
     if existing_match:
         return existing_match
 
-    # Create new match
     new_match = Match(
         user1_id=current_user.id,
         user2_id=roommate_id,
@@ -62,20 +59,16 @@ async def get_matches(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    # Get all matches for the current user
     query = select(Match).where(
         (Match.user1_id == current_user.id) | (Match.user2_id == current_user.id)
     )
     result = await session.execute(query)
     matches = result.scalars().all()
 
-    # Transform matches to include the roommate details
     match_responses = []
     for match in matches:
-        # Determine which user is the roommate
         roommate_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
 
-        # Get roommate details
         query = select(User).where(User.id == roommate_id)
         result = await session.execute(query)
         roommate = result.scalar_one_or_none()
@@ -97,7 +90,6 @@ async def delete_match(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    # Check if match exists and belongs to the current user
     query = select(Match).where(
         (Match.id == match_id) &
         ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
@@ -111,6 +103,5 @@ async def delete_match(
             detail="Match not found",
         )
 
-    # Delete match
     await session.delete(match)
     await session.commit()

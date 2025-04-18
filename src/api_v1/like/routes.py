@@ -26,8 +26,6 @@ async def create_like(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    """Like another user. This can potentially create a match if they liked you too."""
-    # Check if liked user exists
     liked_user = await session.get(User, like_data.liked_id)
     if not liked_user:
         raise HTTPException(
@@ -35,21 +33,18 @@ async def create_like(
             detail="User not found",
         )
 
-    # Can't like yourself
     if current_user.id == like_data.liked_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot like yourself",
         )
 
-    # Create the like
     like, is_match, _ = await like_crud.create_like(
         session=session,
         liker_id=current_user.id,
         liked_id=like_data.liked_id
     )
 
-    # Load the relationship for the response
     like.liker = current_user
     like.liked = liked_user
 
@@ -62,16 +57,14 @@ async def get_received_likes(
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
         status: LikeStatus = None,
 ):
-    """Get likes received by the current user, optionally filtered by status."""
+
     likes = await like_crud.get_received_likes(
         session=session,
         user_id=current_user.id,
         status=status
     )
 
-    # Load relationship data for each like
     for like in likes:
-        # Explicitly load the liker for each like
         if not like.liker:
             like.liker = await session.get(User, like.liker_id)
 
@@ -84,16 +77,13 @@ async def get_sent_likes(
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
         status: LikeStatus = None,
 ):
-    """Get likes sent by the current user, optionally filtered by status."""
     likes = await like_crud.get_sent_likes(
         session=session,
         user_id=current_user.id,
         status=status
     )
 
-    # Load relationship data for each like
     for like in likes:
-        # Explicitly load the liked for each like
         if not like.liked:
             like.liked = await session.get(User, like.liked_id)
 
@@ -105,15 +95,12 @@ async def get_matches(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    """Get all successful matches for the current user."""
     likes = await like_crud.get_matches(
         session=session,
         user_id=current_user.id
     )
 
-    # Load relationship data for each like
     for like in likes:
-        # Explicitly load the liked for each like
         if not like.liked:
             like.liked = await session.get(User, like.liked_id)
 
@@ -127,7 +114,6 @@ async def respond_to_like(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    """Respond to a received like by accepting or declining it."""
     accept = action.action == "accept"
 
     like, _, _ = await like_crud.respond_to_like(
@@ -143,7 +129,6 @@ async def respond_to_like(
             detail="Like not found or you're not authorized to respond to it",
         )
 
-    # Load the liker for the response
     if not like.liker:
         like.liker = await session.get(User, like.liker_id)
 
@@ -155,13 +140,10 @@ async def get_notifications(
         current_user: Annotated[User, Depends(get_current_active_user)],
         session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
-    """Get all notifications for the current user."""
     notifications, unread_count = await like_crud.get_notifications(
         session=session,
         user_id=current_user.id
     )
-
-    # Load related users for each notification
     for notification in notifications:
         if notification.related_user_id and not notification.related_user:
             notification.related_user = await session.get(User, notification.related_user_id)
@@ -191,10 +173,9 @@ async def mark_notification_as_read(
             detail="Notification not found or you're not authorized to mark it as read",
         )
 
-    # Get the updated notification
+  
     notification = await session.get(Notification, notification_id)
 
-    # Load related user
     if notification.related_user_id and not notification.related_user:
         notification.related_user = await session.get(User, notification.related_user_id)
 
