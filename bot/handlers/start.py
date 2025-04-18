@@ -1,7 +1,7 @@
 # bot/handlers/start.py
 import uuid
 import logging
-from aiogram import Router, types
+from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, text, or_
@@ -17,14 +17,16 @@ logger = logging.getLogger(__name__)
 
 
 async def start_command(message: types.Message, state: FSMContext):
+    logger.info(f"Starting command for user {message.from_user.id}")
+
     # Get user from database or create one
     async with postgres_helper.session_factory() as session:
-        # Check if user already exists based on telegram_id or username
+        # Check if user already exists based on telegram_id
         tg_id = str(message.from_user.id)
-        potential_username = f"tg_{message.from_user.id}"
 
         # First try to find by username which is faster and more reliable
-        query = select(User).where(User.username == potential_username)
+        username = f"tg_{message.from_user.id}"
+        query = select(User).where(User.username == username)
         result = await session.execute(query)
         user = result.scalar_one_or_none()
 
@@ -38,10 +40,13 @@ async def start_command(message: types.Message, state: FSMContext):
                 # Found user by telegram_id, get the full user object
                 user = await session.get(User, user_row[0])
 
+        user_is_new = False
         if not user:
+            # User doesn't exist, create a new one
+            user_is_new = True
             try:
                 # Generate username and random password
-                username = potential_username
+                username = f"tg_{message.from_user.id}"
                 email = f"{username}@telegram.user"
                 password = str(uuid.uuid4())
                 hashed_password = get_password_hash(password)
@@ -72,8 +77,8 @@ async def start_command(message: types.Message, state: FSMContext):
                 # Try to find the user one more time
                 query = select(User).where(
                     or_(
-                        User.username == potential_username,
-                        User.email == f"{potential_username}@telegram.user"
+                        User.username == username,
+                        User.email == f"{username}@telegram.user"
                     )
                 )
                 result = await session.execute(query)
@@ -101,37 +106,82 @@ async def start_command(message: types.Message, state: FSMContext):
                     await session.commit()
                     await session.refresh(new_user)
                     user = new_user
+                    user_is_new = True
                     logger.info(f"Created new user with timestamp {username} after handling IntegrityError")
 
         # Store user ID in state
-        await state.update_data(user_id=user.id)
+        await state.update_data(user_id=user.id, is_onboarding=user_is_new)
 
-        # Check if user is a new user (profile not filled) or returning user
-        is_new_user = not any([
-            user.age, user.gender, user.occupation, user.bio,
-            user.cleanliness_level, user.sleep_habits, user.rent_budget
-        ])
+        # Explicitly check if profile info is missing
+        is_profile_incomplete = (
+                user.age is None or
+                user.gender is None or
+                user.occupation is None or
+                user.cleanliness_level is None or
+                user.rent_budget is None
+        )
 
-        if is_new_user:
+        logger.info(f"User {user.id}: is_new={user_is_new}, profile_incomplete={is_profile_incomplete}")
+
+        # If new user or incomplete profile, start onboarding
+        if user_is_new or is_profile_incomplete:
             await message.answer(
                 f"👋 Привет, {user.name or message.from_user.first_name}!\n\n"
                 "Давайте заполним ваш профиль, чтобы найти идеальных соседей для совместной аренды."
             )
 
-            # Start profile setup
-            await message.answer(
-                "Для начала, укажите ваш возраст (число):",
-                reply_markup=types.ReplyKeyboardRemove()
-            )
-            await state.set_state(ProfileStates.edit_age)
+            # Start profile setup with the first missing field
+            if user.age is None:
+                await message.answer(
+                    "Для начала, укажите ваш возраст (число):",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_age)
+            elif user.gender is None:
+                from bot.keyboards.profile_kb import get_gender_keyboard
+                await message.answer(
+                    "Укажите ваш пол:",
+                    reply_markup=get_gender_keyboard()
+                )
+                await state.set_state(ProfileStates.edit_gender)
+            elif user.occupation is None:
+                await message.answer(
+                    "Укажите вашу профессию:",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_occupation)
+            elif user.cleanliness_level is None:
+                await message.answer(
+                    "Оцените уровень вашей чистоплотности от 1 до 5:",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_cleanliness)
+            elif user.rent_budget is None:
+                await message.answer(
+                    "Укажите ваш бюджет на аренду (число в рублях):",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_budget)
+            else:
+                # Continue with other fields as needed
+                await message.answer(
+                    "Продолжим заполнение профиля. Расскажите о себе:",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_bio)
+
         else:
+            # Returning user with complete profile
             await message.answer(
                 f"👋 С возвращением, {user.name or message.from_user.first_name}!"
             )
 
-            # Show profile or main menu
-            from bot.handlers.profile import show_profile
-            await show_profile(message, state)
+            # Show main menu
+            from bot.keyboards.main_kb import get_main_menu_keyboard
+            await message.answer(
+                "Что вы хотите сделать?",
+                reply_markup=get_main_menu_keyboard()
+            )
 
 
 def register_start_handlers(dp):

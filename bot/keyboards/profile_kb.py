@@ -1,40 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
-def get_profile_keyboard() -> InlineKeyboardMarkup:
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✏️ Имя", callback_data="edit_name"),
-                InlineKeyboardButton(text="🔢 Возраст", callback_data="edit_age"),
-                InlineKeyboardButton(text="👤 Пол", callback_data="edit_gender")
-            ],
-            [
-                InlineKeyboardButton(text="💼 Профессия", callback_data="edit_occupation"),
-                InlineKeyboardButton(text="🧹 Чистоплотность", callback_data="edit_cleanliness")
-            ],
-            [
-                InlineKeyboardButton(text="😴 Режим сна", callback_data="edit_sleep"),
-                InlineKeyboardButton(text="💰 Бюджет", callback_data="edit_budget")
-            ],
-            [
-                InlineKeyboardButton(text="📍 Район", callback_data="edit_location"),
-                InlineKeyboardButton(text="🚬 Курение", callback_data="edit_smoking")
-            ],
-            [
-                InlineKeyboardButton(text="🐱 Животные", callback_data="edit_pets"),
-                InlineKeyboardButton(text="👨‍👩‍👧‍👦 Интересы", callback_data="edit_interests")
-            ],
-            [
-                InlineKeyboardButton(text="📝 О себе", callback_data="edit_bio")
-            ],
-            [
-                InlineKeyboardButton(text="🔍 Поиск соседей", callback_data="start_search")
-            ]
-        ]
-    )
-    return keyboard
-
 
 def get_gender_keyboard() -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup(
@@ -74,3 +40,43 @@ def get_interests_keyboard(selected_interests=[]) -> InlineKeyboardMarkup:
     keyboard.append([InlineKeyboardButton(text="✅ Готово", callback_data="interests_done")])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+# bot/keyboards/profile_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+def get_profile_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✏️ Имя", callback_data="edit_name"),
+                InlineKeyboardButton(text="🔢 Возраст", callback_data="edit_age"),
+                InlineKeyboardButton(text="👤 Пол", callback_data="edit_gender")
+            ],
+            [
+                InlineKeyboardButton(text="💼 Профессия", callback_data="edit_occupation"),
+                InlineKeyboardButton(text="🧹 Чистоплотность", callback_data="edit_cleanliness")
+            ],
+            [
+                InlineKeyboardButton(text="😴 Режим сна", callback_data="edit_sleep"),
+                InlineKeyboardButton(text="💰 Бюджет", callback_data="edit_budget")
+            ],
+            [
+                InlineKeyboardButton(text="📍 Район", callback_data="edit_location"),
+                InlineKeyboardButton(text="🚬 Курение", callback_data="edit_smoking")
+            ],
+            [
+                InlineKeyboardButton(text="🐱 Животные", callback_data="edit_pets"),
+                InlineKeyboardButton(text="👨‍👩‍👧‍👦 Интересы", callback_data="edit_interests")
+            ],
+            [
+                InlineKeyboardButton(text="📝 О себе", callback_data="edit_bio")
+            ],
+            [
+                InlineKeyboardButton(text="🔍 Поиск соседей", callback_data="start_search")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Вернуться в меню", callback_data="return_to_menu")
+            ]
+        ]
+    )
+    return keyboard

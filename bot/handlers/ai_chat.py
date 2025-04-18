@@ -1,3 +1,4 @@
+# bot/handlers/ai_chat.py
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -6,6 +7,8 @@ from sqlalchemy import select
 from src.core.database import User, postgres_helper
 from src.core.utils.AIMatchingService import ai_matching_service
 from bot.states.ai_chat_states import AIChatState
+from bot.keyboards.ai_chat_kb import get_ai_chat_keyboard
+from bot.keyboards.main_kb import get_main_menu_keyboard
 from yandex_cloud_ml_sdk import YCloudML
 from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
 
@@ -34,10 +37,20 @@ async def start_ai_chat(message: types.Message, state: FSMContext):
     await message.answer(
         "🤖 Привет! Я ИИ-помощник по бытовым вопросам. "
         "Могу помочь с организацией пространства, уборкой, готовкой, "
-        "решением бытовых конфликтов и многим другим. Просто спросите меня о чем угодно!"
+        "решением бытовых конфликтов и многим другим. Просто спросите меня о чем угодно!",
+        reply_markup=get_ai_chat_keyboard()
     )
 
     await state.set_state(AIChatState.chatting)
+
+
+async def exit_ai_chat(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.answer(
+        "Вы вышли из режима общения с ИИ-помощником. Что бы вы хотели сделать дальше?",
+        reply_markup=get_main_menu_keyboard()
+    )
+    await callback.answer()
 
 
 async def process_ai_query(message: types.Message, state: FSMContext):
@@ -79,7 +92,7 @@ async def process_ai_query(message: types.Message, state: FSMContext):
     # Get AI response
     response = await get_ai_response(query, user_profile)
 
-    await message.answer(response)
+    await message.answer(response, reply_markup=get_ai_chat_keyboard())
 
 
 async def get_ai_response(query: str, user_profile):
@@ -125,4 +138,9 @@ def register_ai_chat_handlers(dp):
     dp.include_router(router)
 
     router.message.register(start_ai_chat, Command("ai_chat"))
+    router.callback_query.register(exit_ai_chat, F.data == "exit_ai_chat")
     router.message.register(process_ai_query, AIChatState.chatting)
+
+
+# bot/keyboards/ai_chat_kb.py
+

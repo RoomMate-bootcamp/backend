@@ -1,3 +1,4 @@
+# bot/handlers/search.py
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -71,7 +72,7 @@ async def start_search(message: types.Message, state: FSMContext):
                 "gender": roommate.gender,
                 "occupation": roommate.occupation,
                 "bio": roommate.bio,
-                "interests": roommate.interests,
+                "interests": roommate.interests or [],  # Ensure interests is a list
                 "cleanliness_level": roommate.cleanliness_level,
                 "sleep_habits": roommate.sleep_habits,
                 "rent_budget": roommate.rent_budget,
@@ -99,20 +100,38 @@ async def show_roommate(message: types.Message, state: FSMContext):
 
     roommate = roommates[current_index]
 
+    # Ensure interests is an iterable list
+    interests = roommate.get('interests', [])
+    if not interests or not isinstance(interests, (list, tuple)):
+        interests = ['Не указано']
+
+    # Check if other fields are None and provide default values
+    name = roommate.get('name') or 'Не указано'
+    age = roommate.get('age') or 'Не указано'
+    gender = roommate.get('gender') or 'Не указано'
+    occupation = roommate.get('occupation') or 'Не указано'
+    cleanliness = roommate.get('cleanliness_level') or 'Не указано'
+    sleep_habits = roommate.get('sleep_habits') or 'Не указано'
+    rent_budget = roommate.get('rent_budget') or 'Не указано'
+    location = roommate.get('location') or 'Не указано'
+    smoking = roommate.get('smoking_preference') or 'Не указано'
+    pets = roommate.get('pet_preference') or 'Не указано'
+    bio = roommate.get('bio') or 'Не указано'
+
     profile_text = (
         f"👤 *Потенциальный сосед*\n\n"
-        f"*Имя:* {roommate.get('name', 'Не указано')}\n"
-        f"*Возраст:* {roommate.get('age', 'Не указано')}\n"
-        f"*Пол:* {roommate.get('gender', 'Не указано')}\n"
-        f"*Профессия:* {roommate.get('occupation', 'Не указано')}\n"
-        f"*Уровень чистоплотности:* {roommate.get('cleanliness_level', 'Не указано')}/5\n"
-        f"*Режим сна:* {roommate.get('sleep_habits', 'Не указано')}\n"
-        f"*Бюджет на аренду:* {roommate.get('rent_budget', 'Не указано')} ₽\n"
-        f"*Район поиска:* {roommate.get('location', 'Не указано')}\n"
-        f"*Отношение к курению:* {roommate.get('smoking_preference', 'Не указано')}\n"
-        f"*Отношение к животным:* {roommate.get('pet_preference', 'Не указано')}\n\n"
-        f"*О себе:*\n{roommate.get('bio', 'Не указано')}\n\n"
-        f"*Интересы:*\n{', '.join(roommate.get('interests', ['Не указано']))}"
+        f"*Имя:* {name}\n"
+        f"*Возраст:* {age}\n"
+        f"*Пол:* {gender}\n"
+        f"*Профессия:* {occupation}\n"
+        f"*Уровень чистоплотности:* {cleanliness}/5\n"
+        f"*Режим сна:* {sleep_habits}\n"
+        f"*Бюджет на аренду:* {rent_budget} ₽\n"
+        f"*Район поиска:* {location}\n"
+        f"*Отношение к курению:* {smoking}\n"
+        f"*Отношение к животным:* {pets}\n\n"
+        f"*О себе:*\n{bio}\n\n"
+        f"*Интересы:*\n{', '.join(interests)}"
     )
 
     await message.answer(profile_text, reply_markup=get_roommate_keyboard(roommate.get('id')))
@@ -177,7 +196,6 @@ async def roommate_action(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# Add this to bot/handlers/search.py
 async def back_to_profile_callback(callback: types.CallbackQuery, state: FSMContext):
     roommate_id = int(callback.data.split("_")[3])
     await callback.answer()
@@ -193,26 +211,43 @@ async def back_to_profile_callback(callback: types.CallbackQuery, state: FSMCont
 
     roommate = roommates[current_index]
 
+    # Ensure interests is an iterable list
+    interests = roommate.get('interests', [])
+    if not interests or not isinstance(interests, (list, tuple)):
+        interests = ['Не указано']
+
+    # Check if other fields are None and provide default values
+    name = roommate.get('name') or 'Не указано'
+    age = roommate.get('age') or 'Не указано'
+    gender = roommate.get('gender') or 'Не указано'
+    occupation = roommate.get('occupation') or 'Не указано'
+    cleanliness = roommate.get('cleanliness_level') or 'Не указано'
+    sleep_habits = roommate.get('sleep_habits') or 'Не указано'
+    rent_budget = roommate.get('rent_budget') or 'Не указано'
+    location = roommate.get('location') or 'Не указано'
+    smoking = roommate.get('smoking_preference') or 'Не указано'
+    pets = roommate.get('pet_preference') or 'Не указано'
+    bio = roommate.get('bio') or 'Не указано'
+
     profile_text = (
         f"👤 *Потенциальный сосед*\n\n"
-        f"*Имя:* {roommate.get('name', 'Не указано')}\n"
-        f"*Возраст:* {roommate.get('age', 'Не указано')}\n"
-        f"*Пол:* {roommate.get('gender', 'Не указано')}\n"
-        f"*Профессия:* {roommate.get('occupation', 'Не указано')}\n"
-        f"*Уровень чистоплотности:* {roommate.get('cleanliness_level', 'Не указано')}/5\n"
-        f"*Режим сна:* {roommate.get('sleep_habits', 'Не указано')}\n"
-        f"*Бюджет на аренду:* {roommate.get('rent_budget', 'Не указано')} ₽\n"
-        f"*Район поиска:* {roommate.get('location', 'Не указано')}\n"
-        f"*Отношение к курению:* {roommate.get('smoking_preference', 'Не указано')}\n"
-        f"*Отношение к животным:* {roommate.get('pet_preference', 'Не указано')}\n\n"
-        f"*О себе:*\n{roommate.get('bio', 'Не указано')}\n\n"
-        f"*Интересы:*\n{', '.join(roommate.get('interests', ['Не указано']))}"
+        f"*Имя:* {name}\n"
+        f"*Возраст:* {age}\n"
+        f"*Пол:* {gender}\n"
+        f"*Профессия:* {occupation}\n"
+        f"*Уровень чистоплотности:* {cleanliness}/5\n"
+        f"*Режим сна:* {sleep_habits}\n"
+        f"*Бюджет на аренду:* {rent_budget} ₽\n"
+        f"*Район поиска:* {location}\n"
+        f"*Отношение к курению:* {smoking}\n"
+        f"*Отношение к животным:* {pets}\n\n"
+        f"*О себе:*\n{bio}\n\n"
+        f"*Интересы:*\n{', '.join(interests)}"
     )
 
     await callback.message.answer(profile_text, reply_markup=get_roommate_keyboard(roommate.get('id')))
 
 
-# Update register_search_handlers function
 def register_search_handlers(dp):
     dp.include_router(router)
 

@@ -4,14 +4,15 @@ from typing import List, Dict, Any, Tuple
 
 from yandex_cloud_ml_sdk import YCloudML
 
+from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
 from src.core.database.alchemy_models.user import User
 
 
 class AIMatchingService:
     def __init__(self):
         self.sdk = YCloudML(
-            folder_id=...,
-            auth=...,
+            folder_id=YANDEX_FOLDER_ID,
+            auth=YANDEX_API_KEY,
         )
         self.model = self.sdk.models.completions('yandexgpt-lite')
         self.model.configure(
