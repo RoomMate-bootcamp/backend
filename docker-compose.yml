@@ -3,7 +3,7 @@ services:
     build: .
     restart: always
     environment:
-      - DB_URL=${DB_URL}
+      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/postgres-bootcamp
     depends_on:
       db:
         condition: service_healthy
@@ -18,7 +18,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=72ZGBYhaq+vLjzWtUatsKw==
-      - POSTGRES_DB=postgres-database
+      - POSTGRES_DB=postgres-bootcamp
     healthcheck:
       test: pg_isready -U postgres
     volumes:
