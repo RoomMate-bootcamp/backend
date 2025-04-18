@@ -127,7 +127,7 @@ FROM base as poetry
 RUN pip install poetry==1.8.2
 COPY poetry.lock pyproject.toml ./
 RUN poetry export -o /requirements.txt --without-hashes
-
+RUN pip install asyncpg
 FROM base as common
 COPY --from=poetry /requirements.txt .
 # Create venv, add it to path and install requirements
@@ -154,8 +154,14 @@ RUN addgroup --gid 1001 --system uvicorn && \
 # Run init.sh script then start uvicorn
 RUN chown -R uvicorn:uvicorn /build
 CMD bash init.sh && \
-    runuser -u uvicorn -- /venv/bin/uvicorn src.main:app --app-dir /build --host 0.0.0.0 --port 8008 --workers 2 --loop uvloop
-EXPOSE 8008
+    runuser -u uvicorn -- /venv/bin/uvicorn src.main:app --app-dir /build --host 0.0.0.0 --port 8010 --workers 2 --loop uvloop
+EXPOSE 8010
+
+# ./init.sh
+#!/bin/bash
+
+echo "Run migrations"
+alembic upgrade head
 
 # ./README.md
 # backend
@@ -166,6 +172,10 @@ DB_ECHO=FALSE
 SECRET_KEY=your-secret-key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=120
+YANDEX_FOLDER_ID=b1gug7c74crq38i2spt2
+YANDEX_API_KEY=AQVN39cHKAHU02Gp0TFQB4GVd7MdFVzo8i4PXuHU
+TELEGRAM_BOT_TOKEN=8166212838:AAHqyHNoEW4BSlyZOUmRm3tpHA-ZcZus75E
+
 
 # ./docker-compose.yml
 services:
@@ -173,12 +183,12 @@ services:
     build: .
     restart: always
     environment:
-      - DB_URL=${DB_URL}
+      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/postgres-bootcamp
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8010:8010"
 
   db:
     image: postgres:16-alpine
@@ -188,7 +198,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=72ZGBYhaq+vLjzWtUatsKw==
-      - POSTGRES_DB=postgres-database
+      - POSTGRES_DB=postgres-bootcamp
     healthcheck:
       test: pg_isready -U postgres
     volumes:
@@ -203,10 +213,866 @@ volumes:
 
 # ./.env.example
 DB_URL=
-DB_ECHO=FALSE
+DB_ECHO=
 SECRET_KEY=your-secret-key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=120
+YANDEX_FOLDER_ID=
+YANDEX_API_KEY=
+
+# ./src/api_v1/like/__init__.py
+
+
+# ./src/api_v1/like/schemas.py
+from datetime import datetime
+from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
+from src.api_v1.user.schemas import RoommateResponse
+
+
+class LikeStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+
+
+class LikeCreate(BaseModel):
+    liked_id: int
+
+
+class LikeResponse(BaseModel):
+    id: int
+    liker_id: int
+    liked_id: int
+    status: LikeStatus
+    timestamp: datetime
+    liker: Optional[RoommateResponse] = None
+    liked: Optional[RoommateResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LikeAction(BaseModel):
+    action: str = Field(..., pattern="^(accept|decline)$")
+
+
+class NotificationType(str, Enum):
+    NEW_LIKE = "new_like"
+    MATCH_CREATED = "match_created"
+    NEW_MESSAGE = "new_message"
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    type: NotificationType
+    content: str
+    related_user_id: Optional[int] = None
+    related_entity_id: Optional[int] = None
+    is_read: bool
+    timestamp: datetime
+    related_user: Optional[RoommateResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationsResponse(BaseModel):
+    notifications: List[NotificationResponse]
+    unread_count: int
+
+# ./src/api_v1/like/crud.py
+from datetime import datetime
+from typing import List, Tuple, Optional
+
+from sqlalchemy import select, and_, or_, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.database.alchemy_models.like import Like, LikeStatus
+from src.core.database.alchemy_models.notification import Notification, NotificationType
+from src.core.database.alchemy_models.user import User
+
+
+async def create_like(
+        session: AsyncSession, liker_id: int, liked_id: int
+) -> Tuple[Like, bool, Optional[Notification]]:
+    query = select(Like).where(
+        and_(
+            Like.liker_id == liked_id,
+            Like.liked_id == liker_id,
+            Like.status != LikeStatus.DECLINED
+        )
+    )
+    result = await session.execute(query)
+    reverse_like = result.scalar_one_or_none()
+
+    query = select(Like).where(
+        and_(
+            Like.liker_id == liker_id,
+            Like.liked_id == liked_id
+        )
+    )
+    result = await session.execute(query)
+    existing_like = result.scalar_one_or_none()
+
+    if existing_like:
+        return existing_like, False, None
+
+    new_like = Like(
+        liker_id=liker_id,
+        liked_id=liked_id,
+        status=LikeStatus.PENDING,
+        timestamp=datetime.utcnow()
+    )
+    session.add(new_like)
+    await session.flush() 
+
+    notification = None
+    is_match = False
+
+    if reverse_like and reverse_like.status == LikeStatus.PENDING:
+        new_like.status = LikeStatus.ACCEPTED
+        reverse_like.status = LikeStatus.ACCEPTED
+        is_match = True
+
+        liker = await session.get(User, liker_id)
+        notification = Notification(
+            user_id=liked_id,
+            type=NotificationType.MATCH_CREATED,
+            content=f"У вас с {liker.name} схожие интересы! Теперь вы можете общаться.",
+            related_user_id=liker_id,
+            related_entity_id=new_like.id,
+            timestamp=datetime.utcnow()
+        )
+        session.add(notification)
+    else:
+        liker = await session.get(User, liker_id)
+        notification = Notification(
+            user_id=liked_id,
+            type=NotificationType.NEW_LIKE,
+            content=f"{liker.name} проявил(а) интерес к вам!",
+            related_user_id=liker_id,
+            related_entity_id=new_like.id,
+            timestamp=datetime.utcnow()
+        )
+        session.add(notification)
+
+    await session.commit()
+    return new_like, is_match, notification
+
+
+async def respond_to_like(
+        session: AsyncSession, like_id: int, user_id: int, accept: bool
+) -> Tuple[Like, Optional[Like], Optional[Notification]]:
+    like = await session.get(Like, like_id)
+    if not like or like.liked_id != user_id:
+        return None, None, None
+
+    if accept:
+        like.status = LikeStatus.ACCEPTED
+
+        query = select(Like).where(
+            and_(
+                Like.liker_id == user_id,
+                Like.liked_id == like.liker_id
+            )
+        )
+        result = await session.execute(query)
+        reverse_like = result.scalar_one_or_none()
+
+        if reverse_like:
+            reverse_like.status = LikeStatus.ACCEPTED
+
+            liker = await session.get(User, user_id)
+            notification = Notification(
+                user_id=like.liker_id,
+                type=NotificationType.MATCH_CREATED,
+                content=f"У вас с {liker.name} схожие интересы! Теперь вы можете общаться.",
+                related_user_id=user_id,
+                related_entity_id=like.id,
+                timestamp=datetime.utcnow()
+            )
+            session.add(notification)
+            await session.commit()
+            return like, reverse_like, notification
+        else:
+            reverse_like = Like(
+                liker_id=user_id,
+                liked_id=like.liker_id,
+                status=LikeStatus.ACCEPTED,
+                timestamp=datetime.utcnow()
+            )
+            session.add(reverse_like)
+
+            liker = await session.get(User, user_id)
+            notification = Notification(
+                user_id=like.liker_id,
+                type=NotificationType.MATCH_CREATED,
+                content=f"У вас с {liker.name} схожие интересы! Теперь вы можете общаться.",
+                related_user_id=user_id,
+                related_entity_id=like.id,
+                timestamp=datetime.utcnow()
+            )
+            session.add(notification)
+            await session.commit()
+            return like, reverse_like, notification
+    else:
+        # Decline the like
+        like.status = LikeStatus.DECLINED
+        await session.commit()
+        return like, None, None
+
+
+async def get_received_likes(
+        session: AsyncSession, user_id: int, status: Optional[LikeStatus] = None
+) -> List[Like]:
+    if status:
+        query = select(Like).where(
+            and_(
+                Like.liked_id == user_id,
+                Like.status == status
+            )
+        ).order_by(Like.timestamp.desc())
+    else:
+        query = select(Like).where(
+            Like.liked_id == user_id
+        ).order_by(Like.timestamp.desc())
+
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
+async def get_sent_likes(
+        session: AsyncSession, user_id: int, status: Optional[LikeStatus] = None
+) -> List[Like]:
+    if status:
+        query = select(Like).where(
+            and_(
+                Like.liker_id == user_id,
+                Like.status == status
+            )
+        ).order_by(Like.timestamp.desc())
+    else:
+        query = select(Like).where(
+            Like.liker_id == user_id
+        ).order_by(Like.timestamp.desc())
+
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
+async def get_matches(session: AsyncSession, user_id: int) -> List[Like]:
+    query = select(Like).where(
+        and_(
+            Like.liker_id == user_id,
+            Like.status == LikeStatus.ACCEPTED
+        )
+    ).order_by(Like.timestamp.desc())
+
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
+async def get_notifications(session: AsyncSession, user_id: int) -> Tuple[List[Notification], int]:
+    query = select(Notification).where(
+        Notification.user_id == user_id
+    ).order_by(Notification.timestamp.desc())
+
+    result = await session.execute(query)
+    notifications = result.scalars().all()
+
+    unread_count = sum(1 for n in notifications if not n.is_read)
+
+    return notifications, unread_count
+
+
+async def mark_as_read(session: AsyncSession, notification_id: int, user_id: int) -> bool:
+    notification = await session.get(Notification, notification_id)
+    if not notification or notification.user_id != user_id:
+        return False
+
+    notification.is_read = True
+    await session.commit()
+    return True
+
+
+async def mark_all_as_read(session: AsyncSession, user_id: int) -> int:
+    query = update(Notification).where(
+        and_(
+            Notification.user_id == user_id,
+            Notification.is_read == False
+        )
+    ).values(is_read=True)
+
+    result = await session.execute(query)
+    await session.commit()
+    return result.rowcount
+
+
+# ./src/api_v1/like/dependencies.py
+
+
+# ./src/api_v1/like/routes.py
+from typing import Annotated, List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api_v1.auth.crud import get_current_active_user
+from src.api_v1.like.schemas import (
+    LikeCreate,
+    LikeResponse,
+    LikeAction,
+    LikeStatus,
+    NotificationResponse,
+    NotificationsResponse
+)
+from src.api_v1.like import crud as like_crud
+from src.core.database import User, postgres_helper, Notification
+
+likes_router = APIRouter(prefix="/likes", tags=["Likes"])
+notifications_router = APIRouter(prefix="/notifications", tags=["Notifications"])
+
+
+@likes_router.post("", response_model=LikeResponse, status_code=status.HTTP_201_CREATED)
+async def create_like(
+        like_data: LikeCreate,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    liked_user = await session.get(User, like_data.liked_id)
+    if not liked_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if current_user.id == like_data.liked_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot like yourself",
+        )
+
+    like, is_match, _ = await like_crud.create_like(
+        session=session,
+        liker_id=current_user.id,
+        liked_id=like_data.liked_id
+    )
+
+    like.liker = current_user
+    like.liked = liked_user
+
+    return like
+
+
+@likes_router.get("/received", response_model=List[LikeResponse])
+async def get_received_likes(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+        status: LikeStatus = None,
+):
+
+    likes = await like_crud.get_received_likes(
+        session=session,
+        user_id=current_user.id,
+        status=status
+    )
+
+    for like in likes:
+        if not like.liker:
+            like.liker = await session.get(User, like.liker_id)
+
+    return likes
+
+
+@likes_router.get("/sent", response_model=List[LikeResponse])
+async def get_sent_likes(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+        status: LikeStatus = None,
+):
+    likes = await like_crud.get_sent_likes(
+        session=session,
+        user_id=current_user.id,
+        status=status
+    )
+
+    for like in likes:
+        if not like.liked:
+            like.liked = await session.get(User, like.liked_id)
+
+    return likes
+
+
+@likes_router.get("/matches", response_model=List[LikeResponse])
+async def get_matches(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    likes = await like_crud.get_matches(
+        session=session,
+        user_id=current_user.id
+    )
+
+    for like in likes:
+        if not like.liked:
+            like.liked = await session.get(User, like.liked_id)
+
+    return likes
+
+
+@likes_router.post("/{like_id}/respond", response_model=LikeResponse)
+async def respond_to_like(
+        like_id: int,
+        action: LikeAction,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    accept = action.action == "accept"
+
+    like, _, _ = await like_crud.respond_to_like(
+        session=session,
+        like_id=like_id,
+        user_id=current_user.id,
+        accept=accept
+    )
+
+    if not like:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Like not found or you're not authorized to respond to it",
+        )
+
+    if not like.liker:
+        like.liker = await session.get(User, like.liker_id)
+
+    return like
+
+
+@notifications_router.get("", response_model=NotificationsResponse)
+async def get_notifications(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    notifications, unread_count = await like_crud.get_notifications(
+        session=session,
+        user_id=current_user.id
+    )
+    for notification in notifications:
+        if notification.related_user_id and not notification.related_user:
+            notification.related_user = await session.get(User, notification.related_user_id)
+
+    return NotificationsResponse(
+        notifications=notifications,
+        unread_count=unread_count
+    )
+
+
+@notifications_router.post("/{notification_id}/read", response_model=NotificationResponse)
+async def mark_notification_as_read(
+        notification_id: int,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    """Mark a notification as read."""
+    success = await like_crud.mark_as_read(
+        session=session,
+        notification_id=notification_id,
+        user_id=current_user.id
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found or you're not authorized to mark it as read",
+        )
+
+  
+    notification = await session.get(Notification, notification_id)
+
+    if notification.related_user_id and not notification.related_user:
+        notification.related_user = await session.get(User, notification.related_user_id)
+
+    return notification
+
+
+@notifications_router.post("/read-all", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_all_notifications_as_read(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    """Mark all notifications as read."""
+    await like_crud.mark_all_as_read(
+        session=session,
+        user_id=current_user.id
+    )
+
+
+# ./src/api_v1/auth/__init__.py
+
+
+# ./src/api_v1/auth/schemas.py
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
+
+
+class UserBase(BaseModel):
+    username: str
+    email: EmailStr
+
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=8)
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: str | None = None
+
+
+class UserResponse(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    is_active: bool
+
+
+# ./src/api_v1/auth/crud.py
+from datetime import datetime, timedelta
+from typing import Annotated, Union
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api_v1.auth.schemas import TokenData
+from src.core.data import settings
+from src.core.database import User, postgres_helper
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+
+async def get_user(username: str, session: AsyncSession):
+    query = select(User).where(User.username == username)
+    result = await session.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def authenticate_user(username: str, password: str, session: AsyncSession):
+    user = await get_user(username, session)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+
+def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+    return encoded_jwt
+
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = await get_user(username=token_data.username, session=session)
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+async def get_current_active_user(
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    if not current_user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+# ./src/api_v1/auth/dependencies.py
+
+
+# ./src/api_v1/auth/routes.py
+from datetime import timedelta
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api_v1.auth.schemas import Token, UserCreate, UserResponse
+from src.api_v1.auth.crud import (
+    authenticate_user,
+    create_access_token,
+    get_current_active_user,
+    get_password_hash,
+    get_user,
+)
+from src.core.data import settings
+from src.core.database import User, postgres_helper
+
+auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@auth_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(
+        user_create: UserCreate,
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    existing_user = await get_user(user_create.username, session)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered",
+        )
+    query = select(User).where(User.email == user_create.email)
+    result = await session.execute(query)
+    
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
+
+
+    hashed_password = get_password_hash(user_create.password)
+    new_user = User(
+        username=user_create.username,
+        email=user_create.email,
+        hashed_password=hashed_password,
+    )
+
+    session.add(new_user)
+    await session.commit()
+    await session.refresh(new_user)
+
+    return new_user
+
+
+@auth_router.post("/login", response_model=Token)
+async def login_for_access_token(
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    user = await authenticate_user(form_data.username, form_data.password, session)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@auth_router.get("/me", response_model=UserResponse)
+async def read_users_me(
+        current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    return current_user
+
+
+# ./src/api_v1/match/__init__.py
+
+
+# ./src/api_v1/match/schemas.py
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict
+
+from src.api_v1.user.schemas import RoommateResponse
+
+
+class MatchBase(BaseModel):
+    user1_id: int
+    user2_id: int
+    timestamp: datetime
+
+
+class MatchCreate(BaseModel):
+    user_id: int
+
+
+class MatchResponse(MatchBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class MatchWithUserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    timestamp: datetime
+    roommate: RoommateResponse
+
+
+class MatchesResponse(BaseModel):
+    matches: list[MatchWithUserResponse]
+
+
+# ./src/api_v1/match/crud.py
+
+
+# ./src/api_v1/match/dependencies.py
+
+
+# ./src/api_v1/match/routes.py
+from datetime import datetime
+from typing import Annotated, List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api_v1.auth.crud import get_current_active_user
+from src.api_v1.match.schemas import MatchResponse, MatchWithUserResponse, MatchesResponse
+from src.core.database import User, postgres_helper
+from src.core.database.alchemy_models.match import Match
+
+matches_router = APIRouter(prefix="/matches", tags=["Matches"])
+
+
+@matches_router.post("/{roommate_id}", response_model=MatchResponse, status_code=status.HTTP_201_CREATED)
+async def create_match(
+        roommate_id: int,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    query = select(User).where(User.id == roommate_id)
+    result = await session.execute(query)
+    roommate = result.scalar_one_or_none()
+
+    if not roommate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Roommate not found",
+        )
+
+    query = select(Match).where(
+        (
+                (Match.user1_id == current_user.id) & (Match.user2_id == roommate_id) |
+                (Match.user1_id == roommate_id) & (Match.user2_id == current_user.id)
+        )
+    )
+    result = await session.execute(query)
+    existing_match = result.scalar_one_or_none()
+
+    if existing_match:
+        return existing_match
+
+    new_match = Match(
+        user1_id=current_user.id,
+        user2_id=roommate_id,
+        timestamp=datetime.utcnow(),
+    )
+
+    session.add(new_match)
+    await session.commit()
+    await session.refresh(new_match)
+
+    return new_match
+
+
+@matches_router.get("/", response_model=List[MatchWithUserResponse])
+async def get_matches(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    query = select(Match).where(
+        (Match.user1_id == current_user.id) | (Match.user2_id == current_user.id)
+    )
+    result = await session.execute(query)
+    matches = result.scalars().all()
+
+    match_responses = []
+    for match in matches:
+        roommate_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
+
+        query = select(User).where(User.id == roommate_id)
+        result = await session.execute(query)
+        roommate = result.scalar_one_or_none()
+
+        if roommate:
+            match_response = MatchWithUserResponse(
+                id=match.id,
+                timestamp=match.timestamp,
+                roommate=roommate
+            )
+            match_responses.append(match_response)
+
+    return match_responses
+
+
+@matches_router.delete("/{match_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_match(
+        match_id: int,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    query = select(Match).where(
+        (Match.id == match_id) &
+        ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
+    )
+    result = await session.execute(query)
+    match = result.scalar_one_or_none()
+
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match not found",
+        )
+
+    await session.delete(match)
+    await session.commit()
+
 
 # ./src/api_v1/__init__.py
 
@@ -215,31 +1081,409 @@ ACCESS_TOKEN_EXPIRE_MINUTES=120
 
 
 # ./src/api_v1/user/schemas.py
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
+
+
+class ProfileBase(BaseModel):
+    name: str | None = None
+    age: int | None = None
+    gender: str | None = None
+    occupation: str | None = None
+    avatar: str | None = None
+    bio: str | None = None
+    interests: list[str] | None = None
+    cleanliness_level: int | None = Field(None, ge=1, le=5)
+    sleep_habits: str | None = None
+    rent_budget: int | None = None
+    location: str | None = None
+    smoking_preference: str | None = None
+    pet_preference: str | None = None
+
+
+class ProfileUpdate(ProfileBase):
+    pass
+
+
+class ProfileResponse(ProfileBase):
+    id: int
+    username: str
+    email: EmailStr
+
+    class Config:
+        from_attributes = True
+
+
+class RoommateResponse(ProfileBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+
+
+# ./src/api_v1/user/crud.py
 
 
 # ./src/api_v1/user/dependencies.py
 
 
 # ./src/api_v1/user/routes.py
-from fastapi import APIRouter, Depends, status
+from typing import Annotated, List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-users_router = APIRouter(
-    prefix="/users",
-    tags=["Users"],
-)
+from src.api_v1.auth.crud import get_current_active_user
+from src.api_v1.user.schemas import ProfileResponse, ProfileUpdate, RoommateResponse
+from src.core.database import User, postgres_helper
+from src.core.database.alchemy_models.match import Match
 
+users_router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@users_router.get("/me", response_model=ProfileResponse)
+async def get_my_profile(
+        current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    return current_user
+
+
+@users_router.put("/me", response_model=ProfileResponse)
+async def update_my_profile(
+        profile: ProfileUpdate,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    for key, value in profile.model_dump(exclude_unset=True).items():
+        setattr(current_user, key, value)
+
+    await session.commit()
+    await session.refresh(current_user)
+
+    return current_user
+
+
+@users_router.get("/roommates", response_model=List[RoommateResponse])
+async def get_potential_roommates(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+
+    query = select(Match).where(
+        ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
+    )
+    result = await session.execute(query)
+    matches = result.scalars().all()
+
+    matched_user_ids = []
+    for match in matches:
+        if match.user1_id == current_user.id:
+            matched_user_ids.append(match.user2_id)
+        else:
+            matched_user_ids.append(match.user1_id)
+
+    query = select(User).where(
+        (User.id != current_user.id) &
+        (~User.id.in_(matched_user_ids))
+    )
+    result = await session.execute(query)
+    potential_roommates = result.scalars().all()
+
+    return potential_roommates
+
+
+# ./src/api_v1/ai_matching/__init__.py
+
+
+# ./src/api_v1/ai_matching/schemas.py
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
+from src.api_v1.user.schemas import RoommateResponse
+
+
+class CompatibilityScore(BaseModel):
+    score: float = Field(..., ge=0, le=100, description="Compatibility score from 0-100")
+    explanation: str = Field(..., description="Explanation of compatibility factors")
+
+
+class AIMatchResponse(BaseModel):
+    user: RoommateResponse
+    compatibility_score: float = Field(..., ge=0, le=100)
+    compatibility_explanation: str
+
+    class Config:
+        from_attributes = True
+
+
+class AIMatchesRequest(BaseModel):
+    limit: Optional[int] = Field(10, ge=1, le=50, description="Maximum number of matches to return")
+
+
+class AIMatchesResponse(BaseModel):
+    matches: List[AIMatchResponse]
+
+    class Config:
+        from_attributes = True
+
+# ./src/api_v1/ai_matching/crud.py
+from datetime import datetime, timedelta
+from typing import Annotated, Union
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api_v1.auth.schemas import TokenData
+from src.core.data import settings
+from src.core.database import User, postgres_helper
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+
+async def get_user(username: str, session: AsyncSession):
+    query = select(User).where(User.username == username)
+    result = await session.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def authenticate_user(username: str, password: str, session: AsyncSession):
+    user = await get_user(username, session)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+
+def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+    return encoded_jwt
+
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = await get_user(username=token_data.username, session=session)
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+async def get_current_active_user(
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    if not current_user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+# ./src/api_v1/ai_matching/dependencies.py
+
+
+# ./src/api_v1/ai_matching/routes.py
+from typing import Annotated, List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api_v1.ai_matching.schemas import AIMatchesResponse, AIMatchResponse, CompatibilityScore
+from src.core.utils.AIMatchingService import ai_matching_service
+from src.api_v1.auth.crud import get_current_active_user
+from src.core.database import User, postgres_helper
+from src.core.database.alchemy_models.match import Match
+
+ai_matching_router = APIRouter(prefix="/ai-matching", tags=["AI Matching"])
+
+
+@ai_matching_router.get("/smart-matches", response_model=AIMatchesResponse)
+async def get_ai_matches(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+        limit: int = Query(10, ge=1, le=50),
+):
+
+    if not current_user.name or not current_user.bio or not current_user.interests:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please complete your profile to get AI matches",
+        )
+
+    query = select(Match).where(
+        ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
+    )
+    result = await session.execute(query)
+    matches = result.scalars().all()
+
+    matched_user_ids = []
+    for match in matches:
+        if match.user1_id == current_user.id:
+            matched_user_ids.append(match.user2_id)
+        else:
+            matched_user_ids.append(match.user1_id)
+
+    query = select(User).where(
+        (User.id != current_user.id) &
+        (~User.id.in_(matched_user_ids))
+    )
+    result = await session.execute(query)
+    potential_matches = result.scalars().all()
+
+    ai_matches = ai_matching_service.get_top_matches(
+        current_user=current_user,
+        potential_matches=potential_matches,
+        limit=limit
+    )
+
+    matches_response = AIMatchesResponse(
+        matches=[
+            AIMatchResponse(
+                user=match["user"],
+                compatibility_score=match["compatibility_score"],
+                compatibility_explanation=match["compatibility_explanation"]
+            )
+            for match in ai_matches
+        ]
+    )
+
+    return matches_response
+
+
+@ai_matching_router.get("/{user_id}/compatibility", response_model=CompatibilityScore)
+async def get_compatibility_score(
+        user_id: int,
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+):
+    query = select(User).where(User.id == user_id)
+    result = await session.execute(query)
+    other_user = result.scalar_one_or_none()
+
+    if not other_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    score, explanation = ai_matching_service.calculate_compatibility_score(
+        current_user, other_user
+    )
+
+    return CompatibilityScore(score=score, explanation=explanation)
 
 # ./src/core/database/alchemy_models/user.py
+from sqlalchemy import Integer, String, Boolean, Float, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database.alchemy_models.base import Base
 
 
 class User(Base):
-    username: Mapped[str]
+    username: Mapped[str] = mapped_column(unique=True)
+    email: Mapped[str] = mapped_column(unique=True)
+    hashed_password: Mapped[str]
     is_active: Mapped[bool] = mapped_column(default=True)
     is_superuser: Mapped[bool] = mapped_column(default=False)
+
+    name: Mapped[str] = mapped_column(nullable=True)
+    age: Mapped[int] = mapped_column(Integer, nullable=True)
+    gender: Mapped[str] = mapped_column(nullable=True)
+    occupation: Mapped[str] = mapped_column(nullable=True)
+    avatar: Mapped[str] = mapped_column(nullable=True)
+    bio: Mapped[str] = mapped_column(nullable=True)
+    interests: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
+    cleanliness_level: Mapped[int] = mapped_column(Integer, nullable=True)
+    sleep_habits: Mapped[str] = mapped_column(nullable=True)
+    rent_budget: Mapped[int] = mapped_column(Integer, nullable=True)
+    location: Mapped[str] = mapped_column(nullable=True)
+    smoking_preference: Mapped[str] = mapped_column(nullable=True)
+    pet_preference: Mapped[str] = mapped_column(nullable=True)
+
+# ./src/core/database/alchemy_models/notification.py
+from datetime import datetime
+from enum import Enum as PyEnum
+from sqlalchemy import ForeignKey, String, DateTime, Enum, Boolean
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.core.database.alchemy_models.base import Base
+
+
+class NotificationType(str, PyEnum):
+    NEW_LIKE = "new_like"
+    MATCH_CREATED = "match_created"
+    NEW_MESSAGE = "new_message"
+
+
+class Notification(Base):
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
+    content: Mapped[str] = mapped_column(String)
+    related_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
+    related_entity_id: Mapped[int] = mapped_column(nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id], backref="notifications")
+    related_user = relationship("User", foreign_keys=[related_user_id])
+
+
+# ./src/core/database/alchemy_models/like.py
+from datetime import datetime
+from enum import Enum as PyEnum
+from sqlalchemy import ForeignKey, String, DateTime, Enum, Boolean
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.core.database.alchemy_models.base import Base
+
+
+class LikeStatus(str, PyEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+
+
+class Like(Base):
+    liker_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    liked_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[LikeStatus] = mapped_column(
+        Enum(LikeStatus), default=LikeStatus.PENDING
+    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    liker = relationship("User", foreign_keys=[liker_id], backref="likes_given")
+    liked = relationship("User", foreign_keys=[liked_id], backref="likes_received")
 
 
 # ./src/core/database/alchemy_models/__init__.py
@@ -259,14 +1503,37 @@ class Base(DeclarativeBase):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
 
+# ./src/core/database/alchemy_models/match.py
+from datetime import datetime
+from sqlalchemy import ForeignKey, DateTime
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.core.database.alchemy_models.base import Base
+
+
+class Match(Base):
+    user1_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user2_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user1 = relationship("User", foreign_keys=[user1_id], backref="matches_as_user1")
+    user2 = relationship("User", foreign_keys=[user2_id], backref="matches_as_user2")
+
+
 # ./src/core/database/__init__.py
 __all__ = (
     "postgres_helper",
     "Base",
     "User",
+    "Match",
+    "Like",
+    "Notification",
 )
 
 from src.core.database.alchemy_models.base import Base
+from src.core.database.alchemy_models.like import Like
+from src.core.database.alchemy_models.match import Match
+from src.core.database.alchemy_models.notification import Notification
 from src.core.database.alchemy_models.user import User
 from src.core.database.helpers.postgres_helper import postgres_helper
 
@@ -333,6 +1600,106 @@ postgres_helper = DatabaseHelper(
 # ./src/core/__init__.py
 
 
+# ./src/core/utils/AIMatchingService.py
+import os
+import json
+from typing import List, Dict, Any, Tuple
+
+from yandex_cloud_ml_sdk import YCloudML
+
+from src.core.database.alchemy_models.user import User
+
+
+class AIMatchingService:
+    def __init__(self):
+        self.sdk = YCloudML(
+            folder_id=...,
+            auth=...,
+        )
+        self.model = self.sdk.models.completions('yandexgpt-lite')
+        self.model.configure(
+            temperature=0.3,
+            max_tokens=2000,
+        )
+
+    def calculate_compatibility_score(self, user1: User, user2: User) -> Tuple[float, str]:
+        system_prompt = (
+            "You are an expert roommate matching algorithm. Analyze two potential roommates' "
+            "profiles and calculate a compatibility score from 0-100 based on their preferences. "
+            "Return a JSON object with 'score' (number) and 'explanation' (string) fields."
+        )
+
+        user_data = {
+            "user1": {
+                "age": user1.age,
+                "gender": user1.gender,
+                "occupation": user1.occupation,
+                "bio": user1.bio,
+                "interests": user1.interests or [],
+                "cleanliness_level": user1.cleanliness_level,
+                "sleep_habits": user1.sleep_habits,
+                "rent_budget": user1.rent_budget,
+                "location": user1.location,
+                "smoking_preference": user1.smoking_preference,
+                "pet_preference": user1.pet_preference
+            },
+            "user2": {
+                "age": user2.age,
+                "gender": user2.gender,
+                "occupation": user2.occupation,
+                "bio": user2.bio,
+                "interests": user2.interests or [],
+                "cleanliness_level": user2.cleanliness_level,
+                "sleep_habits": user2.sleep_habits,
+                "rent_budget": user2.rent_budget,
+                "location": user2.location,
+                "smoking_preference": user2.smoking_preference,
+                "pet_preference": user2.pet_preference
+            }
+        }
+
+        user_prompt = f"Analyze these two potential roommates for compatibility:\n{json.dumps(user_data, indent=2)}"
+
+        messages = [
+            {'role': 'system', 'text': system_prompt},
+            {'role': 'user', 'text': user_prompt},
+        ]
+
+        operation = self.model.run_deferred(messages)
+        result = operation.wait()
+
+        try:
+            ai_response = json.loads(result.text)
+            score = float(ai_response.get('score', 50))
+            explanation = ai_response.get('explanation', "No explanation provided")
+            return (score, explanation)
+        except (json.JSONDecodeError, ValueError):
+            # If we can't parse the response, return a default score
+            return (50, "Could not analyze compatibility - using default score")
+
+    def get_top_matches(self, current_user: User, potential_matches: List[User], limit: int = 10) -> list[
+        dict[str, Any]]:
+        matches = []
+
+        for potential_match in potential_matches:
+            if potential_match.id == current_user.id:
+                continue
+
+            score, explanation = self.calculate_compatibility_score(current_user, potential_match)
+
+            matches.append({
+                "user": potential_match,
+                "compatibility_score": score,
+                "compatibility_explanation": explanation
+            })
+
+        matches.sort(key=lambda x: x["compatibility_score"], reverse=True)
+
+        return matches[:limit]
+
+
+ai_matching_service = AIMatchingService()
+
 # ./src/core/utils/__init__.py
 
 
@@ -350,6 +1717,9 @@ class Settings(BaseSettings):
     secret_key: str
     algorithm: str
     access_token_expire_minutes: int
+
+    yandex_folder_id: str
+    yandex_api_key: str
 
     model_config = SettingsConfigDict(env_file=".env")
 
@@ -379,6 +1749,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from scalar_fastapi import get_scalar_api_reference
 from starlette.middleware.sessions import SessionMiddleware
 
+from src.api_v1.ai_matching.routes import ai_matching_router
+from src.api_v1.auth.routes import auth_router
+from src.api_v1.like.routes import likes_router, notifications_router
+from src.api_v1.match.routes import matches_router
 from src.api_v1.user.routes import users_router
 
 
@@ -389,8 +1763,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(root_path="/api/v1", lifespan=lifespan, debug=True)
 app.include_router(
-    users_router,
+    users_router
 )
+app.include_router(
+    auth_router
+)
+app.include_router(
+    matches_router
+)
+app.include_router(ai_matching_router)
+app.include_router(likes_router)
+app.include_router(notifications_router)
 
 app.add_middleware(
     CORSMiddleware,

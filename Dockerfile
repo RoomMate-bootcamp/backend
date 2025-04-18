@@ -10,7 +10,7 @@ FROM base as poetry
 RUN pip install poetry==1.8.2
 COPY poetry.lock pyproject.toml ./
 RUN poetry export -o /requirements.txt --without-hashes
-
+RUN pip install asyncpg
 FROM base as common
 COPY --from=poetry /requirements.txt .
 # Create venv, add it to path and install requirements

@@ -1,4 +1,5 @@
 from sqlalchemy import Integer, String, Boolean, Float, ARRAY
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database.alchemy_models.base import Base
@@ -10,6 +11,8 @@ class User(Base):
     hashed_password: Mapped[str]
     is_active: Mapped[bool] = mapped_column(default=True)
     is_superuser: Mapped[bool] = mapped_column(default=False)
+
+    user_metadata: Mapped[dict] = mapped_column(JSON, nullable=True)
 
     name: Mapped[str] = mapped_column(nullable=True)
     age: Mapped[int] = mapped_column(Integer, nullable=True)
