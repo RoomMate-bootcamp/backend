@@ -37,5 +37,5 @@ RUN addgroup --gid 1001 --system uvicorn && \
 # Run init.sh script then start uvicorn
 RUN chown -R uvicorn:uvicorn /build
 CMD bash init.sh && \
-    runuser -u uvicorn -- /venv/bin/uvicorn src.main:app --app-dir /build --host 0.0.0.0 --port 8008 --workers 2 --loop uvloop
-EXPOSE 8008
+    runuser -u uvicorn -- /venv/bin/uvicorn src.main:app --app-dir /build --host 0.0.0.0 --port 8010 --workers 2 --loop uvloop
+EXPOSE 8010
