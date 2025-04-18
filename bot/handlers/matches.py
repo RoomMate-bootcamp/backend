@@ -17,7 +17,6 @@ async def show_matches(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
         return
 
-    # Get matches
     async with postgres_helper.session_factory() as session:
         query = select(Match).where(
             or_(
@@ -30,7 +29,6 @@ async def show_matches(message: types.Message, state: FSMContext):
 
         matches_data = []
         for match in matches:
-            # Get other user
             other_id = match.user2_id if match.user1_id == user_id else match.user1_id
             other_user = await session.get(User, other_id)
 
@@ -65,7 +63,6 @@ async def show_match_details(callback: types.CallbackQuery, state: FSMContext):
             await callback.answer()
             return
 
-        # Get other user
         other_id = match.user2_id if match.user1_id == user_id else match.user1_id
         roommate = await session.get(User, other_id)
 
@@ -106,7 +103,6 @@ async def delete_match(callback: types.CallbackQuery, state: FSMContext):
             await callback.answer()
             return
 
-        # Check if user is part of the match
         if match.user1_id != user_id and match.user2_id != user_id:
             await callback.message.answer("У вас нет прав для удаления этого совпадения.")
             await callback.answer()

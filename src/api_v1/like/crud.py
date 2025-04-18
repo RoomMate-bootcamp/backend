@@ -133,7 +133,6 @@ async def respond_to_like(
             await session.commit()
             return like, reverse_like, notification
     else:
-        # Decline the like
         like.status = LikeStatus.DECLINED
         await session.commit()
         return like, None, None

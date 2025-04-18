@@ -2,7 +2,7 @@ import aiohttp
 import json
 from typing import Dict, Any, Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000/api/v1"  # Or your actual API URL
+BASE_URL = "http://127.0.0.1:8000/api/v1"
 
 
 async def check_user_exists(username: str) -> bool:
@@ -32,7 +32,6 @@ async def register_user(username: str, email: str, password: str) -> bool:
 async def login_user(username: str, password: str) -> Tuple[bool, Optional[str]]:
     async with aiohttp.ClientSession() as session:
         try:
-            # Using form data for OAuth2 login
             data = {"username": username, "password": password}
             async with session.post(f"{BASE_URL}/auth/login", data=data) as response:
                 if response.status == 200:

@@ -1,16 +1,19 @@
-# bot/handlers/search.py
+import logging
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, and_, not_, or_
 
 from bot.keyboards.search_kb import get_roommate_keyboard, get_compatibility_keyboard
+from bot.keyboards.main_kb import get_main_menu_keyboard
 from src.core.database import User, postgres_helper, Like, Match
 from src.core.database.alchemy_models.like import LikeStatus
 from src.api_v1.like.crud import create_like
 from src.core.utils.AIMatchingService import ai_matching_service
+from bot.handlers.notifications import check_notifications
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 async def start_search(message: types.Message, state: FSMContext):
@@ -21,12 +24,9 @@ async def start_search(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
         return
 
-    # Get potential roommates
     async with postgres_helper.session_factory() as session:
-        # Get current user
         current_user = await session.get(User, user_id)
 
-        # First, get all matches to exclude
         query = select(Match).where(
             or_(
                 Match.user1_id == user_id,
@@ -43,7 +43,6 @@ async def start_search(message: types.Message, state: FSMContext):
             else:
                 matched_ids.append(match.user1_id)
 
-        # Get all likes already sent
         query = select(Like).where(
             Like.liker_id == user_id
         )
@@ -52,7 +51,6 @@ async def start_search(message: types.Message, state: FSMContext):
 
         liked_ids = [like.liked_id for like in likes_sent]
 
-        # Get all users except current user and those already matched or liked
         exclude_ids = matched_ids + liked_ids + [user_id]
         query = select(User).where(
             and_(
@@ -72,7 +70,7 @@ async def start_search(message: types.Message, state: FSMContext):
                 "gender": roommate.gender,
                 "occupation": roommate.occupation,
                 "bio": roommate.bio,
-                "interests": roommate.interests or [],  # Ensure interests is a list
+                "interests": roommate.interests or [],
                 "cleanliness_level": roommate.cleanliness_level,
                 "sleep_habits": roommate.sleep_habits,
                 "rent_budget": roommate.rent_budget,
@@ -82,7 +80,10 @@ async def start_search(message: types.Message, state: FSMContext):
             })
 
     if not roommates_data:
-        await message.answer("🔍 На данный момент нет подходящих соседей. Попробуйте позже.")
+        await message.answer(
+            "🔍 На данный момент нет подходящих соседей. Попробуйте позже.",
+            reply_markup=get_main_menu_keyboard()
+        )
         return
 
     await state.update_data(roommates=roommates_data, current_index=0)
@@ -95,17 +96,18 @@ async def show_roommate(message: types.Message, state: FSMContext):
     current_index = user_data.get("current_index", 0)
 
     if not roommates or current_index >= len(roommates):
-        await message.answer("🔍 Вы просмотрели всех потенциальных соседей. Попробуйте позже.")
+        await message.answer(
+            "🔍 Вы просмотрели всех потенциальных соседей. Попробуйте позже.",
+            reply_markup=get_main_menu_keyboard()
+        )
         return
 
     roommate = roommates[current_index]
 
-    # Ensure interests is an iterable list
     interests = roommate.get('interests', [])
     if not interests or not isinstance(interests, (list, tuple)):
         interests = ['Не указано']
 
-    # Check if other fields are None and provide default values
     name = roommate.get('name') or 'Не указано'
     age = roommate.get('age') or 'Не указано'
     gender = roommate.get('gender') or 'Не указано'
@@ -151,7 +153,6 @@ async def check_compatibility(callback: types.CallbackQuery, state: FSMContext):
             await callback.answer()
             return
 
-        # Use AI service to calculate compatibility
         score, explanation = ai_matching_service.calculate_compatibility_score(current_user, roommate)
 
         compatibility_text = (
@@ -172,7 +173,6 @@ async def roommate_action(callback: types.CallbackQuery, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if action == "like":
-        # Like roommate
         async with postgres_helper.session_factory() as session:
             like, is_match, notification = await create_like(
                 session=session,
@@ -184,12 +184,15 @@ async def roommate_action(callback: types.CallbackQuery, state: FSMContext):
                 await callback.message.answer(
                     "✅ Совпадение! Вы можете начать общение с этим пользователем."
                 )
+
+                await check_notifications(roommate_id, callback.bot)
             else:
                 await callback.message.answer(
                     "👍 Вы проявили интерес к этому пользователю."
                 )
 
-    # Move to next roommate
+                await check_notifications(roommate_id, callback.bot)
+
     current_index = user_data.get("current_index", 0)
     await state.update_data(current_index=current_index + 1)
     await show_roommate(callback.message, state)
@@ -200,23 +203,23 @@ async def back_to_profile_callback(callback: types.CallbackQuery, state: FSMCont
     roommate_id = int(callback.data.split("_")[3])
     await callback.answer()
 
-    # Show roommate profile again
     user_data = await state.get_data()
     roommates = user_data.get("roommates", [])
     current_index = user_data.get("current_index", 0)
 
     if not roommates or current_index >= len(roommates):
-        await callback.message.answer("Не удалось отобразить профиль. Попробуйте /search.")
+        await callback.message.answer(
+            "Не удалось отобразить профиль. Попробуйте /search.",
+            reply_markup=get_main_menu_keyboard()
+        )
         return
 
     roommate = roommates[current_index]
 
-    # Ensure interests is an iterable list
     interests = roommate.get('interests', [])
     if not interests or not isinstance(interests, (list, tuple)):
         interests = ['Не указано']
 
-    # Check if other fields are None and provide default values
     name = roommate.get('name') or 'Не указано'
     age = roommate.get('age') or 'Не указано'
     gender = roommate.get('gender') or 'Не указано'

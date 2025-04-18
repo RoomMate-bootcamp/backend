@@ -1,7 +1,7 @@
 import aiohttp
 from typing import Dict, Any, List, Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000/api/v1"  # Or your actual API URL
+BASE_URL = "http://127.0.0.1:8000/api/v1"
 
 
 async def get_potential_roommates(token: str) -> List[Dict[str, Any]]:
@@ -59,7 +59,6 @@ async def like_roommate(token: str, liked_id: int) -> Tuple[bool, bool]:
             ) as response:
                 if response.status == 201:
                     response_data = await response.json()
-                    # Check if it's a match (status is "accepted")
                     is_match = response_data.get("status") == "accepted"
                     return True, is_match
                 return False, False

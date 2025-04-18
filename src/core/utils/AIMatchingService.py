@@ -72,7 +72,6 @@ class AIMatchingService:
             explanation = ai_response.get('explanation', "No explanation provided")
             return (score, explanation)
         except (json.JSONDecodeError, ValueError):
-            # If we can't parse the response, return a default score
             return (50, "Could not analyze compatibility - using default score")
 
     def get_top_matches(self, current_user: User, potential_matches: List[User], limit: int = 10) -> list[
