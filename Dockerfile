@@ -29,7 +29,6 @@ COPY alembic.ini .
 COPY pyproject.toml .
 COPY init.sh .
 
-COPY helper_files /build/helper_files
 
 # Create new user to run app process as unprivilaged user
 RUN addgroup --gid 1001 --system uvicorn && \
