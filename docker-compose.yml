@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    restart: always
+    environment:
+      - DB_URL=${DB_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=72ZGBYhaq+vLjzWtUatsKw==
+      - POSTGRES_DB=postgres-database
+    healthcheck:
+      test: pg_isready -U postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+
+
+volumes:
+  pgdata:
+  dbdata6:
