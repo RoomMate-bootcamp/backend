@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     algorithm: str
     access_token_expire_minutes: int
 
+    yandex_folder_id: str
+    yandex_api_key: str
+
     model_config = SettingsConfigDict(env_file=".env")
 
 

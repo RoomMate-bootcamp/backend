@@ -6,7 +6,7 @@ authors = [
     {name = "ITSDENISSKA",email = "fotiev.d1991@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<4.0"
 
 [tool.poetry.dependencies]
 scalar-fastapi = "^1.0.3"
@@ -24,6 +24,7 @@ passlib = "^1.7.4"
 pydantic = {extras = ["email"], version = "^2.11.3"}
 python-multipart = "^0.0.20"
 bcrypt = "^4.3.0"
+yandex-cloud-ml-sdk = "^0.9.0"
 
 
 [build-system]
