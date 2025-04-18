@@ -1,0 +1,414 @@
+# ./alembic.ini
+# A generic, single database configuration.
+
+[alembic]
+# path to migration scripts
+script_location = alembic
+
+# template used to generate migration file names; The default value is %%(rev)s_%%(slug)s
+# Uncomment the line below if you want the files to be prepended with date and time
+file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
+
+# sys.path path, will be prepended to sys.path if present.
+# defaults to the current working directory.
+prepend_sys_path = .
+
+# timezone to use when rendering the date within the migration file
+# as well as the filename.
+# If specified, requires the python>=3.9 or backports.zoneinfo library.
+# Any required deps can installed by adding `alembic[tz]` to the pip requirements
+# string value is passed to ZoneInfo()
+# leave blank for localtime
+# timezone =
+
+# max length of characters to apply to the
+# "slug" field
+# truncate_slug_length = 40
+
+# set to 'true' to run the environment during
+# the 'revision' command, regardless of autogenerate
+# revision_environment = false
+
+# set to 'true' to allow .pyc and .pyo files without
+# a source .py file to be detected as revisions in the
+# versions/ directory
+# sourceless = false
+
+# version location specification; This defaults
+# to alembic/versions.  When using multiple version
+# directories, initial revisions must be specified with --version-path.
+# The path separator used here should be the separator specified by "version_path_separator" below.
+# version_locations = %(here)s/bar:%(here)s/bat:alembic/versions
+
+# version path separator; As mentioned above, this is the character used to split
+# version_locations. The default within new alembic.ini files is "os", which uses os.pathsep.
+# If this key is omitted entirely, it falls back to the legacy behavior of splitting on spaces and/or commas.
+# Valid values for version_path_separator are:
+#
+# version_path_separator = :
+# version_path_separator = ;
+# version_path_separator = space
+version_path_separator = os  # Use os.pathsep. Default configuration used for new projects.
+
+# set to 'true' to search source files recursively
+# in each "version_locations" directory
+# new in Alembic version 1.10
+# recursive_version_locations = false
+
+# the output encoding used when revision files
+# are written from script.py.mako
+# output_encoding = utf-8
+
+sqlalchemy.url = postgresql+psycopg://denisfotiev:@localhost:5432/dodo-certificate-db
+
+
+[post_write_hooks]
+# post_write_hooks defines scripts or Python functions that are run
+# on newly generated revision scripts.  See the documentation for further
+# detail and examples
+
+# format using "black" - use the console_scripts runner, against the "black" entrypoint
+# hooks = black
+# black.type = console_scripts
+# black.entrypoint = black
+# black.options = -l 79 REVISION_SCRIPT_FILENAME
+
+# lint with attempts to fix using "ruff" - use the exec runner, execute a binary
+# hooks = ruff
+# ruff.type = exec
+# ruff.executable = %(here)s/.venv/bin/ruff
+# ruff.options = --fix REVISION_SCRIPT_FILENAME
+
+# Logging configuration
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+
+# ./Dockerfile
+FROM python:3.12.3-slim-bullseye as base
+
+ENV PYTHONUNBUFFERED 1
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y gcc
+
+# Create requirements.txt file
+FROM base as poetry
+RUN pip install poetry==1.8.2
+COPY poetry.lock pyproject.toml ./
+RUN poetry export -o /requirements.txt --without-hashes
+
+FROM base as common
+COPY --from=poetry /requirements.txt .
+# Create venv, add it to path and install requirements
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+RUN pip install -r requirements.txt
+
+# Install uvicorn server
+RUN pip install uvicorn[standard]
+
+# Copy the rest of app
+COPY src src
+COPY .env .env
+COPY alembic alembic
+COPY alembic.ini .
+COPY pyproject.toml .
+COPY init.sh .
+
+
+# Create new user to run app process as unprivilaged user
+RUN addgroup --gid 1001 --system uvicorn && \
+    adduser --gid 1001 --shell /bin/false --disabled-password --uid 1001 uvicorn
+
+# Run init.sh script then start uvicorn
+RUN chown -R uvicorn:uvicorn /build
+CMD bash init.sh && \
+    runuser -u uvicorn -- /venv/bin/uvicorn src.main:app --app-dir /build --host 0.0.0.0 --port 8008 --workers 2 --loop uvloop
+EXPOSE 8008
+
+# ./README.md
+# backend
+
+# ./.env
+DB_URL=postgresql+psycopg://denisfotiev:@localhost:5432/bootcamp-postgres
+DB_ECHO=FALSE
+SECRET_KEY=your-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=120
+
+# ./docker-compose.yml
+services:
+  app:
+    build: .
+    restart: always
+    environment:
+      - DB_URL=${DB_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=72ZGBYhaq+vLjzWtUatsKw==
+      - POSTGRES_DB=postgres-database
+    healthcheck:
+      test: pg_isready -U postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+
+
+volumes:
+  pgdata:
+  dbdata6:
+
+
+# ./.env.example
+DB_URL=
+DB_ECHO=FALSE
+SECRET_KEY=your-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=120
+
+# ./src/api_v1/__init__.py
+
+
+# ./src/api_v1/user/__init__.py
+
+
+# ./src/api_v1/user/schemas.py
+
+
+# ./src/api_v1/user/dependencies.py
+
+
+# ./src/api_v1/user/routes.py
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+users_router = APIRouter(
+    prefix="/users",
+    tags=["Users"],
+)
+
+
+# ./src/core/database/alchemy_models/user.py
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.core.database.alchemy_models.base import Base
+
+
+class User(Base):
+    username: Mapped[str]
+    is_active: Mapped[bool] = mapped_column(default=True)
+    is_superuser: Mapped[bool] = mapped_column(default=False)
+
+
+# ./src/core/database/alchemy_models/__init__.py
+
+
+# ./src/core/database/alchemy_models/base.py
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
+
+
+class Base(DeclarativeBase):
+    __abstract__ = True
+
+    @declared_attr
+    def __tablename__(cls) -> str:
+        return f"{cls.__name__.lower()}s"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+
+# ./src/core/database/__init__.py
+__all__ = (
+    "postgres_helper",
+    "Base",
+    "User",
+)
+
+from src.core.database.alchemy_models.base import Base
+from src.core.database.alchemy_models.user import User
+from src.core.database.helpers.postgres_helper import postgres_helper
+
+
+# ./src/core/database/helpers/__init__.py
+
+
+# ./src/core/database/helpers/postgres_helper.py
+from asyncio import current_task
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_scoped_session,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from src.core.data import settings
+
+
+class DatabaseHelper:
+    def __init__(self, url: str, echo: bool = False):
+        self.engine = create_async_engine(
+            url=url,
+            echo=echo,
+            pool_size=10,
+            max_overflow=20,
+            pool_timeout=60,
+            pool_recycle=1800,
+        )
+        self.session_factory = async_sessionmaker(
+            bind=self.engine,
+            autoflush=False,
+            autocommit=False,
+            expire_on_commit=False,
+        )
+
+    async def get_scoped_session(self):
+        session = async_scoped_session(
+            session_factory=self.session_factory,
+            scopefunc=current_task,
+        )
+        return session
+
+    async def session_dependency(self) -> AsyncSession:
+        async with self.session_factory() as session:
+            yield session
+            await session.close()
+
+    async def scoped_session_dependency(self) -> AsyncSession:
+        session = await self.get_scoped_session()
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
+postgres_helper = DatabaseHelper(
+    url=settings.db_url,
+    echo=settings.db_echo,
+)
+
+
+# ./src/core/__init__.py
+
+
+# ./src/core/utils/__init__.py
+
+
+# ./src/core/data/config.py
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    db_url: str
+    db_echo: bool = False
+
+    secret_key: str
+    algorithm: str
+    access_token_expire_minutes: int
+
+    model_config = SettingsConfigDict(env_file=".env")
+
+
+@lru_cache
+def get_settings():
+    return Settings()
+
+
+settings = get_settings()
+
+
+# ./src/core/data/__init__.py
+__all__ = ("settings",)
+
+from src.core.data.config import settings
+
+
+# ./src/__init__.py
+
+
+# ./src/main.py
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from scalar_fastapi import get_scalar_api_reference
+from starlette.middleware.sessions import SessionMiddleware
+
+from src.api_v1.user.routes import users_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+
+
+app = FastAPI(root_path="/api/v1", lifespan=lifespan, debug=True)
+app.include_router(
+    users_router,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/scalar", include_in_schema=False)
+async def scalar_html():
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title=app.title,
+    )
+
+
+app.add_middleware(SessionMiddleware, secret_key="123")
+
+
