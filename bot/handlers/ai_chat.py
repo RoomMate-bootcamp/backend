@@ -1,4 +1,4 @@
-# bot/handlers/ai_chat.py
+import asyncio
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -14,7 +14,6 @@ from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
 
 router = Router()
 
-# Initialize YandexGPT
 sdk = YCloudML(
     folder_id=YANDEX_FOLDER_ID,
     auth=YANDEX_API_KEY
@@ -65,14 +64,12 @@ async def process_ai_query(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
         return
 
-    # Get user profile for context
     async with postgres_helper.session_factory() as session:
         user = await session.get(User, user_id)
         if not user:
             await message.answer("Ошибка при получении данных пользователя.")
             return
 
-        # Create profile context
         user_profile = {
             "name": user.name,
             "age": user.age,
@@ -86,13 +83,33 @@ async def process_ai_query(message: types.Message, state: FSMContext):
 
     query = message.text
 
-    # Show typing indicator
     await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
-    # Get AI response
-    response = await get_ai_response(query, user_profile)
+    waiting_msg = await message.answer("⏳ Обдумываю ответ, пожалуйста, подождите...")
 
-    await message.answer(response, reply_markup=get_ai_chat_keyboard())
+    async def keep_typing():
+        for _ in range(30):
+            await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+            await asyncio.sleep(4)
+
+    typing_task = asyncio.create_task(keep_typing())
+
+    try:
+        response = await get_ai_response(query, user_profile)
+
+        typing_task.cancel()
+
+        await waiting_msg.delete()
+
+        await message.answer(response, reply_markup=get_ai_chat_keyboard())
+    except Exception as e:
+        typing_task.cancel()
+
+        await waiting_msg.edit_text(
+            f"😕 Произошла ошибка при получении ответа: {str(e)}\n"
+            "Пожалуйста, попробуйте еще раз или задайте другой вопрос.",
+            reply_markup=get_ai_chat_keyboard()
+        )
 
 
 async def get_ai_response(query: str, user_profile):
@@ -140,7 +157,3 @@ def register_ai_chat_handlers(dp):
     router.message.register(start_ai_chat, Command("ai_chat"))
     router.callback_query.register(exit_ai_chat, F.data == "exit_ai_chat")
     router.message.register(process_ai_query, AIChatState.chatting)
-
-
-# bot/keyboards/ai_chat_kb.py
-

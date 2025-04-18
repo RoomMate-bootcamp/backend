@@ -41,7 +41,6 @@ def get_interests_keyboard(selected_interests=[]) -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
-# bot/keyboards/profile_kb.py
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 def get_profile_keyboard() -> InlineKeyboardMarkup:
@@ -69,6 +68,14 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="👨‍👩‍👧‍👦 Интересы", callback_data="edit_interests")
             ],
             [
+                InlineKeyboardButton(text="🏛️ ВУЗ/Город учебы", callback_data="edit_study_location"),
+                InlineKeyboardButton(text="📚 Специальность", callback_data="edit_study_program")
+            ],
+            [
+                InlineKeyboardButton(text="🏠 Предпочтения по жилью", callback_data="edit_accommodation"),
+                InlineKeyboardButton(text="📱 Ник в Telegram", callback_data="edit_telegram_username")
+            ],
+            [
                 InlineKeyboardButton(text="📝 О себе", callback_data="edit_bio")
             ],
             [
@@ -76,6 +83,22 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="🔙 Вернуться в меню", callback_data="return_to_menu")
+            ]
+        ]
+    )
+    return keyboard
+
+def get_accommodation_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🏢 Квартира", callback_data="accommodation_apartment"),
+            ],
+            [
+                InlineKeyboardButton(text="🏨 Общежитие", callback_data="accommodation_dormitory"),
+            ],
+            [
+                InlineKeyboardButton(text="🔄 Не имеет значения", callback_data="accommodation_no_preference"),
             ]
         ]
     )

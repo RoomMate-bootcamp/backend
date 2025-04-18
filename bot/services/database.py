@@ -2,10 +2,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import postgres_helper
 
 
-async def init_db():
-    # Just use the existing database connection from src
-    pass
-
 
 async def get_session() -> AsyncSession:
     async with postgres_helper.session_factory() as session:

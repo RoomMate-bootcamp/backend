@@ -1,3 +1,19 @@
+# ./run.py
+# run.py
+import asyncio
+import logging
+from bot.main import start_bot
+
+if __name__ == "__main__":
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
+    # Run the bot
+    asyncio.run(start_bot())
+
 # ./alembic.ini
 # A generic, single database configuration.
 
@@ -174,7 +190,2152 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=120
 YANDEX_FOLDER_ID=b1gug7c74crq38i2spt2
 YANDEX_API_KEY=AQVN39cHKAHU02Gp0TFQB4GVd7MdFVzo8i4PXuHU
-TELEGRAM_BOT_TOKEN=8166212838:AAHqyHNoEW4BSlyZOUmRm3tpHA-ZcZus75E
+TELEGRAM_BOT_TOKEN=8075974820:AAGxmuuKKxFE89i5YE2b7SpOzTbA3k-HhVs
+
+
+# ./bot/config.py
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+DB_URL = os.getenv("DB_URL")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+WEBAPP_HOST = os.getenv("WEBAPP_HOST", "localhost")
+WEBAPP_PORT = os.getenv("WEBAPP_PORT", 8000)
+
+YANDEX_FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
+YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
+
+
+# ./bot/keyboards/search_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+def get_roommate_keyboard(roommate_id) -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👎 Пропустить", callback_data=f"roommate_skip_{roommate_id}"),
+                InlineKeyboardButton(text="👍 Нравится", callback_data=f"roommate_like_{roommate_id}")
+            ],
+            [
+                InlineKeyboardButton(text="📊 Проверить совместимость", callback_data=f"compatibility_{roommate_id}")
+            ]
+        ]
+    )
+    return keyboard
+
+def get_compatibility_keyboard(roommate_id) -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👎 Пропустить", callback_data=f"roommate_skip_{roommate_id}"),
+                InlineKeyboardButton(text="👍 Нравится", callback_data=f"roommate_like_{roommate_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Назад к профилю", callback_data=f"back_to_profile_{roommate_id}")
+            ]
+        ]
+    )
+    return keyboard
+
+# ./bot/keyboards/start_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+def get_start_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🔑 Авторизация", callback_data="auth_login"),
+                InlineKeyboardButton(text="📝 Регистрация", callback_data="auth_register")
+            ],
+        ]
+    )
+    return keyboard
+
+def get_auth_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🔑 Авторизация", callback_data="auth_login"),
+                InlineKeyboardButton(text="📝 Регистрация", callback_data="auth_register")
+            ],
+        ]
+    )
+    return keyboard
+
+# ./bot/keyboards/main_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+def get_main_menu_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👤 Мой профиль", callback_data="show_profile")
+            ],
+            [
+                InlineKeyboardButton(text="🔍 Поиск соседей", callback_data="start_search")
+            ],
+            [
+                InlineKeyboardButton(text="🔄 Мои совпадения", callback_data="show_matches")
+            ],
+            [
+                InlineKeyboardButton(text="🤖 ИИ-помощник", callback_data="start_ai_chat")
+            ]
+        ]
+    )
+    return keyboard
+
+# ./bot/keyboards/matches_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+
+def get_matches_keyboard(matches) -> InlineKeyboardMarkup:
+    keyboard = []
+
+    for match in matches:
+        roommate = match.get("roommate", {})
+        name = roommate.get("name", "Неизвестно")
+        keyboard.append([
+            InlineKeyboardButton(text=f"👤 {name}", callback_data=f"match_{match.get('id')}")
+        ])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_match_actions_keyboard(match_id) -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💬 Связаться", callback_data=f"contact_{match_id}")
+            ],
+            [
+                InlineKeyboardButton(text="❌ Удалить совпадение", callback_data=f"delete_match_{match_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Назад к совпадениям", callback_data="back_to_matches")
+            ]
+        ]
+    )
+    return keyboard
+
+
+def get_main_menu_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👤 Мой профиль", callback_data="show_profile")
+            ],
+            [
+                InlineKeyboardButton(text="🔍 Поиск соседей", callback_data="start_search")
+            ],
+            [
+                InlineKeyboardButton(text="🔄 Мои совпадения", callback_data="show_matches")
+            ],
+            [
+                InlineKeyboardButton(text="🤖 ИИ-помощник", callback_data="start_ai_chat")
+            ]
+        ]
+    )
+    return keyboard
+
+# ./bot/keyboards/__init__.py
+
+
+# ./bot/keyboards/profile_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+
+
+def get_gender_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Мужской", callback_data="gender_male"),
+                InlineKeyboardButton(text="Женский", callback_data="gender_female")
+            ],
+            [
+                InlineKeyboardButton(text="Другой", callback_data="gender_other")
+            ]
+        ]
+    )
+    return keyboard
+
+
+def get_interests_keyboard(selected_interests=[]) -> InlineKeyboardMarkup:
+    interests = [
+        "Спорт", "Музыка", "Кино", "Литература", "Технологии",
+        "Путешествия", "Кулинария", "Игры", "Искусство", "Фотография"
+    ]
+
+    keyboard = []
+
+    for i in range(0, len(interests), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(interests):
+                interest = interests[i + j]
+                prefix = "✅ " if interest in selected_interests else ""
+                row.append(InlineKeyboardButton(
+                    text=f"{prefix}{interest}",
+                    callback_data=f"interest_{interest}"
+                ))
+        keyboard.append(row)
+
+    keyboard.append([InlineKeyboardButton(text="✅ Готово", callback_data="interests_done")])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+# bot/keyboards/profile_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+def get_profile_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✏️ Имя", callback_data="edit_name"),
+                InlineKeyboardButton(text="🔢 Возраст", callback_data="edit_age"),
+                InlineKeyboardButton(text="👤 Пол", callback_data="edit_gender")
+            ],
+            [
+                InlineKeyboardButton(text="💼 Профессия", callback_data="edit_occupation"),
+                InlineKeyboardButton(text="🧹 Чистоплотность", callback_data="edit_cleanliness")
+            ],
+            [
+                InlineKeyboardButton(text="😴 Режим сна", callback_data="edit_sleep"),
+                InlineKeyboardButton(text="💰 Бюджет", callback_data="edit_budget")
+            ],
+            [
+                InlineKeyboardButton(text="📍 Район", callback_data="edit_location"),
+                InlineKeyboardButton(text="🚬 Курение", callback_data="edit_smoking")
+            ],
+            [
+                InlineKeyboardButton(text="🐱 Животные", callback_data="edit_pets"),
+                InlineKeyboardButton(text="👨‍👩‍👧‍👦 Интересы", callback_data="edit_interests")
+            ],
+            [
+                InlineKeyboardButton(text="🏛️ ВУЗ/Город учебы", callback_data="edit_study_location"),
+                InlineKeyboardButton(text="📚 Специальность", callback_data="edit_study_program")
+            ],
+            [
+                InlineKeyboardButton(text="🏠 Предпочтения по жилью", callback_data="edit_accommodation"),
+                InlineKeyboardButton(text="📱 Ник в Telegram", callback_data="edit_telegram_username")
+            ],
+            [
+                InlineKeyboardButton(text="📝 О себе", callback_data="edit_bio")
+            ],
+            [
+                InlineKeyboardButton(text="🔍 Поиск соседей", callback_data="start_search")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Вернуться в меню", callback_data="return_to_menu")
+            ]
+        ]
+    )
+    return keyboard
+
+def get_accommodation_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🏢 Квартира", callback_data="accommodation_apartment"),
+            ],
+            [
+                InlineKeyboardButton(text="🏨 Общежитие", callback_data="accommodation_dormitory"),
+            ],
+            [
+                InlineKeyboardButton(text="🔄 Не имеет значения", callback_data="accommodation_no_preference"),
+            ]
+        ]
+    )
+    return keyboard
+
+# ./bot/keyboards/ai_chat_kb.py
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+
+def get_ai_chat_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="❌ Завершить диалог с ИИ", callback_data="exit_ai_chat")
+            ]
+        ]
+    )
+    return keyboard
+
+# ./bot/middlewares/auth.py
+from typing import Callable, Dict, Any, Awaitable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+from aiogram.fsm.context import FSMContext
+
+
+class AuthMiddleware(BaseMiddleware):
+    async def __call__(
+            self,
+            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+            event: TelegramObject,
+            data: Dict[str, Any]
+    ) -> Any:
+        # Get FSM context from data
+        fsm_context: FSMContext = data.get("state")
+
+        if fsm_context:
+            # Get user data from FSM storage
+            user_data = await fsm_context.get_data()
+
+            # Add token to data if available
+            if "token" in user_data:
+                data["token"] = user_data["token"]
+
+        # Continue processing
+        return await handler(event, data)
+
+# ./bot/middlewares/__init__.py
+from aiogram import Dispatcher
+
+from bot.middlewares.auth import AuthMiddleware
+
+def setup_middlewares(dp: Dispatcher):
+    dp.update.middleware(AuthMiddleware())
+
+
+# ./bot/__init__.py
+from bot.main import start_bot
+
+# ./bot/states/search_states.py
+from aiogram.fsm.state import State, StatesGroup
+
+class SearchStates(StatesGroup):
+    browsing = State()
+    compatibility_check = State()
+
+# ./bot/states/profile_states.py
+from aiogram.fsm.state import State, StatesGroup
+
+
+class ProfileStates(StatesGroup):
+    edit_name = State()
+    edit_age = State()
+    edit_gender = State()
+    edit_occupation = State()
+    edit_bio = State()
+    edit_interests = State()
+    edit_cleanliness = State()
+    edit_sleep = State()
+    edit_budget = State()
+    edit_location = State()
+    edit_smoking = State()
+    edit_pets = State()
+
+    # New education and accommodation states
+    edit_study_location = State()
+    edit_study_program = State()
+    edit_accommodation = State()
+    edit_telegram_username = State()
+
+# ./bot/states/__init__.py
+
+
+# ./bot/states/ai_chat_states.py
+from aiogram.fsm.state import State, StatesGroup
+
+class AIChatState(StatesGroup):
+    chatting = State()
+
+# ./bot/states/auth_states.py
+from aiogram.fsm.state import State, StatesGroup
+
+class AuthStates(StatesGroup):
+    get_username = State()
+    get_email = State()
+    get_password = State()
+    login_username = State()
+    login_password = State()
+    profile_setup = State()
+
+
+# ./bot/main.py
+# bot/main.py (add to existing file)
+import asyncio
+import logging
+from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.strategy import FSMStrategy
+
+from bot.handlers import register_all_handlers
+from bot.middlewares import setup_middlewares
+from bot.config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_PATH, WEBAPP_HOST, WEBAPP_PORT
+from bot.services.database import init_db
+from bot.handlers.notifications import check_notifications
+from src.core.database import postgres_helper
+from sqlalchemy import select, text
+from src.core.database import User
+
+
+async def periodic_notification_check(bot: Bot):
+    """Periodically check for new notifications for all users"""
+    while True:
+        try:
+            logging.info("Running periodic notification check")
+
+            # Get all users with telegram_id in user_metadata
+            async with postgres_helper.session_factory() as session:
+                # Get all users that have a telegram_id in their metadata
+                query = text("SELECT id FROM users WHERE user_metadata->>'telegram_id' IS NOT NULL")
+                result = await session.execute(query)
+                users = result.fetchall()
+
+                for user_row in users:
+                    user_id = user_row[0]
+                    await check_notifications(user_id, bot)
+
+            # Run every 60 seconds
+            await asyncio.sleep(60)
+        except Exception as e:
+            logging.error(f"Error in periodic notification check: {e}")
+            await asyncio.sleep(60)  # Still wait before retrying
+
+
+async def start_bot():
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
+    # Initialize bot and dispatcher
+    bot = Bot(token=BOT_TOKEN)
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage, fsm_strategy=FSMStrategy.CHAT)
+
+    # Setup middlewares
+    setup_middlewares(dp)
+
+    # Register all handlers
+    register_all_handlers(dp)
+
+    # Initialize database connection
+    await init_db()
+
+    # Start periodic notification checker
+    asyncio.create_task(periodic_notification_check(bot))
+
+    # Start polling
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+
+
+if __name__ == "__main__":
+    asyncio.run(start_bot())
+
+# ./bot/handlers/matches.py
+from aiogram import Router, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from sqlalchemy import select, or_
+
+from bot.keyboards.matches_kb import get_matches_keyboard, get_match_actions_keyboard
+from src.core.database import User, postgres_helper, Match
+
+router = Router()
+
+
+async def show_matches(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if not user_id:
+        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        return
+
+    # Get matches
+    async with postgres_helper.session_factory() as session:
+        query = select(Match).where(
+            or_(
+                Match.user1_id == user_id,
+                Match.user2_id == user_id
+            )
+        )
+        result = await session.execute(query)
+        matches = result.scalars().all()
+
+        matches_data = []
+        for match in matches:
+            # Get other user
+            other_id = match.user2_id if match.user1_id == user_id else match.user1_id
+            other_user = await session.get(User, other_id)
+
+            if other_user:
+                matches_data.append({
+                    "id": match.id,
+                    "timestamp": match.timestamp,
+                    "roommate": {
+                        "id": other_user.id,
+                        "name": other_user.name,
+                        "username": other_user.username
+                    }
+                })
+
+    if not matches_data:
+        await message.answer("У вас пока нет совпадений. Используйте /search, чтобы найти потенциальных соседей.")
+        return
+
+    await message.answer("🔄 Ваши совпадения:", reply_markup=get_matches_keyboard(matches_data))
+
+
+async def show_match_details(callback: types.CallbackQuery, state: FSMContext):
+    match_id = int(callback.data.split("_")[1])
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    async with postgres_helper.session_factory() as session:
+        match = await session.get(Match, match_id)
+
+        if not match:
+            await callback.message.answer("Совпадение не найдено.")
+            await callback.answer()
+            return
+
+        # Get other user
+        other_id = match.user2_id if match.user1_id == user_id else match.user1_id
+        roommate = await session.get(User, other_id)
+
+        if not roommate:
+            await callback.message.answer("Пользователь не найден.")
+            await callback.answer()
+            return
+
+        profile_text = (
+            f"👥 *Ваше совпадение*\n\n"
+            f"*Имя:* {roommate.name or 'Не указано'}\n"
+            f"*Возраст:* {roommate.age or 'Не указано'}\n"
+            f"*Пол:* {roommate.gender or 'Не указано'}\n"
+            f"*Профессия:* {roommate.occupation or 'Не указано'}\n"
+            f"*Уровень чистоплотности:* {roommate.cleanliness_level or 'Не указано'}/5\n"
+            f"*Режим сна:* {roommate.sleep_habits or 'Не указано'}\n"
+            f"*Бюджет на аренду:* {roommate.rent_budget or 'Не указано'} ₽\n"
+            f"*Район поиска:* {roommate.location or 'Не указано'}\n"
+            f"*О себе:*\n{roommate.bio or 'Не указано'}\n\n"
+            f"*Интересы:*\n{', '.join(roommate.interests or ['Не указано'])}"
+        )
+
+        await callback.message.answer(profile_text, reply_markup=get_match_actions_keyboard(match_id))
+
+    await callback.answer()
+
+
+async def delete_match(callback: types.CallbackQuery, state: FSMContext):
+    match_id = int(callback.data.split("_")[1])
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    async with postgres_helper.session_factory() as session:
+        match = await session.get(Match, match_id)
+
+        if not match:
+            await callback.message.answer("Совпадение не найдено.")
+            await callback.answer()
+            return
+
+        # Check if user is part of the match
+        if match.user1_id != user_id and match.user2_id != user_id:
+            await callback.message.answer("У вас нет прав для удаления этого совпадения.")
+            await callback.answer()
+            return
+
+        await session.delete(match)
+        await session.commit()
+
+        await callback.message.answer("✅ Совпадение удалено.")
+        await show_matches(callback.message, state)
+
+    await callback.answer()
+
+
+def register_matches_handlers(dp):
+    dp.include_router(router)
+
+    router.message.register(show_matches, Command("matches"))
+    router.callback_query.register(show_match_details, F.data.startswith("match_"))
+    router.callback_query.register(delete_match, F.data.startswith("delete_match_"))
+    router.callback_query.register(back_to_matches_callback, F.data == "back_to_matches")
+
+
+async def back_to_matches_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await show_matches(callback.message, state)
+
+
+# ./bot/handlers/ai_chat.py
+# bot/handlers/ai_chat.py
+import asyncio
+from aiogram import Router, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from sqlalchemy import select
+
+from src.core.database import User, postgres_helper
+from src.core.utils.AIMatchingService import ai_matching_service
+from bot.states.ai_chat_states import AIChatState
+from bot.keyboards.ai_chat_kb import get_ai_chat_keyboard
+from bot.keyboards.main_kb import get_main_menu_keyboard
+from yandex_cloud_ml_sdk import YCloudML
+from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
+
+router = Router()
+
+# Initialize YandexGPT
+sdk = YCloudML(
+    folder_id=YANDEX_FOLDER_ID,
+    auth=YANDEX_API_KEY
+)
+model = sdk.models.completions('yandexgpt-lite')
+model.configure(
+    temperature=0.5,
+    max_tokens=2000,
+)
+
+
+async def start_ai_chat(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if not user_id:
+        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        return
+
+    await message.answer(
+        "🤖 Привет! Я ИИ-помощник по бытовым вопросам. "
+        "Могу помочь с организацией пространства, уборкой, готовкой, "
+        "решением бытовых конфликтов и многим другим. Просто спросите меня о чем угодно!",
+        reply_markup=get_ai_chat_keyboard()
+    )
+
+    await state.set_state(AIChatState.chatting)
+
+
+async def exit_ai_chat(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.answer(
+        "Вы вышли из режима общения с ИИ-помощником. Что бы вы хотели сделать дальше?",
+        reply_markup=get_main_menu_keyboard()
+    )
+    await callback.answer()
+
+
+async def process_ai_query(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state != "AIChatState:chatting":
+        return
+
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if not user_id:
+        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        return
+
+    # Get user profile for context
+    async with postgres_helper.session_factory() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            await message.answer("Ошибка при получении данных пользователя.")
+            return
+
+        # Create profile context
+        user_profile = {
+            "name": user.name,
+            "age": user.age,
+            "gender": user.gender,
+            "cleanliness_level": user.cleanliness_level,
+            "sleep_habits": user.sleep_habits,
+            "smoking_preference": user.smoking_preference,
+            "pet_preference": user.pet_preference,
+            "interests": user.interests or []
+        }
+
+    query = message.text
+
+    # Show typing indicator
+    await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+    # Send waiting message
+    waiting_msg = await message.answer("⏳ Обдумываю ответ, пожалуйста, подождите...")
+
+    # Start a task to periodically update typing status while waiting for response
+    async def keep_typing():
+        for _ in range(30):  # Limit to prevent infinite loop
+            await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+            await asyncio.sleep(4)  # Telegram typing indicator lasts ~5 seconds
+
+    typing_task = asyncio.create_task(keep_typing())
+
+    try:
+        # Get AI response
+        response = await get_ai_response(query, user_profile)
+
+        # Cancel typing indicator
+        typing_task.cancel()
+
+        # Delete waiting message
+        await waiting_msg.delete()
+
+        # Send the actual response
+        await message.answer(response, reply_markup=get_ai_chat_keyboard())
+    except Exception as e:
+        # Cancel typing indicator
+        typing_task.cancel()
+
+        # Update waiting message with error
+        await waiting_msg.edit_text(
+            f"😕 Произошла ошибка при получении ответа: {str(e)}\n"
+            "Пожалуйста, попробуйте еще раз или задайте другой вопрос.",
+            reply_markup=get_ai_chat_keyboard()
+        )
+
+
+async def get_ai_response(query: str, user_profile):
+    system_prompt = """
+    Ты - полезный ассистент по бытовым вопросам для соседей по квартире.
+    Ты помогаешь с решением бытовых проблем, организацией пространства, уборкой, 
+    готовкой, разрешением конфликтов между соседями по квартире и другими домашними вопросами.
+    Всегда давай конкретные и практичные советы с учетом информации о пользователе.
+    """
+
+    user_context = ""
+    if user_profile:
+        user_context = f"""
+        Вот информация о пользователе:
+        - Имя: {user_profile.get('name', 'Неизвестно')}
+        - Возраст: {user_profile.get('age', 'Неизвестно')}
+        - Пол: {user_profile.get('gender', 'Неизвестно')}
+        - Чистоплотность (1-5): {user_profile.get('cleanliness_level', 'Неизвестно')}
+        - Режим сна: {user_profile.get('sleep_habits', 'Неизвестно')}
+        - Отношение к курению: {user_profile.get('smoking_preference', 'Неизвестно')}
+        - Отношение к животным: {user_profile.get('pet_preference', 'Неизвестно')}
+        - Интересы: {', '.join(user_profile.get('interests', ['Неизвестно']))}
+
+        Используй эту информацию, чтобы дать персонализированный совет.
+        """
+
+    user_prompt = f"{user_context}\n\nВопрос: {query}"
+
+    messages = [
+        {'role': 'system', 'text': system_prompt},
+        {'role': 'user', 'text': user_prompt},
+    ]
+
+    try:
+        operation = model.run_deferred(messages)
+        result = operation.wait()
+        return result.text
+    except Exception as e:
+        return f"Извините, произошла ошибка при обработке вашего запроса: {str(e)}"
+
+
+def register_ai_chat_handlers(dp):
+    dp.include_router(router)
+
+    router.message.register(start_ai_chat, Command("ai_chat"))
+    router.callback_query.register(exit_ai_chat, F.data == "exit_ai_chat")
+    router.message.register(process_ai_query, AIChatState.chatting)
+
+# ./bot/handlers/profile.py
+# bot/handlers/profile.py
+import logging
+from aiogram import Router, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+
+from bot.states.profile_states import ProfileStates
+from bot.keyboards.profile_kb import get_profile_keyboard, get_gender_keyboard, get_interests_keyboard, \
+    get_accommodation_keyboard
+from bot.keyboards.main_kb import get_main_menu_keyboard
+from src.core.database import User, postgres_helper
+
+router = Router()
+logger = logging.getLogger(__name__)
+
+
+async def show_profile(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if not user_id:
+        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        return
+
+    async with postgres_helper.session_factory() as session:
+        user = await session.get(User, user_id)
+
+        if not user:
+            await message.answer("Произошла ошибка при загрузке профиля. Используйте /start для перезапуска бота.")
+            return
+
+        # Map accommodation preference to readable text
+        accommodation_map = {
+            "apartment": "Квартира",
+            "dormitory": "Общежитие",
+            "no_preference": "Не имеет значения"
+        }
+
+        accommodation_text = accommodation_map.get(user.accommodation_preference, "Не указано")
+
+        profile_text = (
+            f"👤 *Ваш профиль*\n\n"
+            f"*Имя:* {user.name or 'Не указано'}\n"
+            f"*Возраст:* {user.age or 'Не указано'}\n"
+            f"*Пол:* {user.gender or 'Не указано'}\n"
+            f"*Профессия:* {user.occupation or 'Не указано'}\n\n"
+
+            f"*📚 Образование:*\n"
+            f"*ВУЗ/Город учебы:* {user.study_location or 'Не указано'}\n"
+            f"*Специальность:* {user.study_program or 'Не указано'}\n\n"
+
+            f"*🏠 Жилищные предпочтения:*\n"
+            f"*Предпочтение по жилью:* {accommodation_text}\n"
+            f"*Бюджет на аренду:* {user.rent_budget or 'Не указано'} ₽\n"
+            f"*Район поиска:* {user.location or 'Не указано'}\n\n"
+
+            f"*⚙️ Личные привычки:*\n"
+            f"*Уровень чистоплотности:* {user.cleanliness_level or 'Не указано'}/5\n"
+            f"*Режим сна:* {user.sleep_habits or 'Не указано'}\n"
+            f"*Отношение к курению:* {user.smoking_preference or 'Не указано'}\n"
+            f"*Отношение к животным:* {user.pet_preference or 'Не указано'}\n\n"
+
+            f"*Telegram username:* {user.telegram_username or 'Не указано'}\n\n"
+
+            f"*О себе:*\n{user.bio or 'Не указано'}\n\n"
+            f"*Интересы:*\n{', '.join(user.interests or ['Не указано'])}"
+        )
+
+        await message.answer(profile_text, parse_mode="Markdown", reply_markup=get_profile_keyboard())
+
+
+async def edit_profile_callback(callback: types.CallbackQuery, state: FSMContext):
+    field = callback.data.split("_")[1]
+
+    field_prompts = {
+        "name": "Введите ваше имя:",
+        "age": "Введите ваш возраст (число):",
+        "gender": "Выберите ваш пол:",
+        "occupation": "Укажите вашу профессию:",
+        "bio": "Расскажите о себе:",
+        "interests": "Выберите ваши интересы:",
+        "cleanliness": "Оцените уровень вашей чистоплотности от 1 до 5:",
+        "sleep": "Опишите ваш режим сна (например, 'жаворонок', 'сова'):",
+        "budget": "Укажите ваш бюджет на аренду (число в рублях):",
+        "location": "Укажите предпочтительный район поиска:",
+        "smoking": "Укажите ваше отношение к курению:",
+        "pets": "Укажите ваше отношение к домашним животным:",
+        "study_location": "Укажите ВУЗ или город, где вы учитесь/планируете учиться:",
+        "study_program": "Укажите вашу специальность или направление обучения:",
+        "accommodation": "Выберите предпочтительный вариант жилья:",
+        "telegram_username": "Укажите ваш username в Telegram (без @):"
+    }
+
+    field_states = {
+        "name": ProfileStates.edit_name,
+        "age": ProfileStates.edit_age,
+        "gender": ProfileStates.edit_gender,
+        "occupation": ProfileStates.edit_occupation,
+        "bio": ProfileStates.edit_bio,
+        "interests": ProfileStates.edit_interests,
+        "cleanliness": ProfileStates.edit_cleanliness,
+        "sleep": ProfileStates.edit_sleep,
+        "budget": ProfileStates.edit_budget,
+        "location": ProfileStates.edit_location,
+        "smoking": ProfileStates.edit_smoking,
+        "pets": ProfileStates.edit_pets,
+        "study_location": ProfileStates.edit_study_location,
+        "study_program": ProfileStates.edit_study_program,
+        "accommodation": ProfileStates.edit_accommodation,
+        "telegram_username": ProfileStates.edit_telegram_username
+    }
+
+    await state.update_data(edit_field=field)
+
+    if field == "gender":
+        await callback.message.answer(field_prompts[field], reply_markup=get_gender_keyboard())
+    elif field == "interests":
+        # Get current user interests
+        user_data = await state.get_data()
+        user_id = user_data.get("user_id")
+
+        async with postgres_helper.session_factory() as session:
+            user = await session.get(User, user_id)
+            current_interests = user.interests or []
+
+        await callback.message.answer(field_prompts[field], reply_markup=get_interests_keyboard(current_interests))
+        await state.update_data(selected_interests=current_interests)
+    elif field == "accommodation":
+        await callback.message.answer(field_prompts[field], reply_markup=get_accommodation_keyboard())
+    else:
+        await callback.message.answer(field_prompts[field])
+
+    await state.set_state(field_states[field])
+    await callback.answer()
+
+
+async def process_profile_edit(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if not user_id:
+        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        return
+
+    current_state = await state.get_state()
+    value = message.text
+
+    # Map states directly to DB fields
+    field_mapping = {
+        "ProfileStates:edit_name": "name",
+        "ProfileStates:edit_age": "age",
+        "ProfileStates:edit_gender": "gender",
+        "ProfileStates:edit_occupation": "occupation",
+        "ProfileStates:edit_bio": "bio",
+        "ProfileStates:edit_cleanliness": "cleanliness_level",
+        "ProfileStates:edit_sleep": "sleep_habits",
+        "ProfileStates:edit_budget": "rent_budget",
+        "ProfileStates:edit_location": "location",
+        "ProfileStates:edit_smoking": "smoking_preference",
+        "ProfileStates:edit_pets": "pet_preference",
+        "ProfileStates:edit_study_location": "study_location",
+        "ProfileStates:edit_study_program": "study_program",
+        "ProfileStates:edit_telegram_username": "telegram_username"
+    }
+
+    # Get field directly from state
+    api_field = field_mapping.get(current_state)
+
+    if not api_field:
+        logger.error(f"No field mapping for state: {current_state}")
+        await message.answer("Произошла ошибка. Пожалуйста, попробуйте снова.")
+        return
+
+    # Validate input for certain fields
+    if api_field == "age" or api_field == "rent_budget":
+        if not value.isdigit():
+            await message.answer("Пожалуйста, введите число.")
+            return
+        value = int(value)
+
+    if api_field == "cleanliness_level":
+        if not value.isdigit() or int(value) < 1 or int(value) > 5:
+            await message.answer("Пожалуйста, введите число от 1 до 5.")
+            return
+        value = int(value)
+
+    if api_field == "telegram_username":
+        # Remove @ if user included it
+        if value.startswith('@'):
+            value = value[1:]
+
+    # Update profile
+    async with postgres_helper.session_factory() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            await message.answer("Пользователь не найден. Используйте /start для перезапуска бота.")
+            return
+
+        setattr(user, api_field, value)
+
+        try:
+            await session.commit()
+            logger.info(f"Updated user {user.id} field {api_field} to {value}")
+
+            # Check if this is part of the initial setup
+            is_onboarding = user_data.get("edit_field") is None
+
+            if is_onboarding:
+                # Move to next profile setup step based on current field
+                if api_field == "age":
+                    await message.answer("Отлично! Теперь укажите ваш пол:", reply_markup=get_gender_keyboard())
+                    await state.set_state(ProfileStates.edit_gender)
+                    return
+                elif api_field == "occupation":
+                    await message.answer("Хорошо! Теперь укажите ВУЗ или город, где вы учитесь/планируете учиться:")
+                    await state.set_state(ProfileStates.edit_study_location)
+                    return
+                elif api_field == "study_location":
+                    await message.answer("Укажите вашу специальность или направление обучения:")
+                    await state.set_state(ProfileStates.edit_study_program)
+                    return
+                elif api_field == "study_program":
+                    await message.answer("Выберите предпочтительный вариант жилья:",
+                                         reply_markup=get_accommodation_keyboard())
+                    await state.set_state(ProfileStates.edit_accommodation)
+                    return
+                elif api_field == "bio":
+                    await message.answer("Отлично! Теперь оцените уровень вашей чистоплотности от 1 до 5:")
+                    await state.set_state(ProfileStates.edit_cleanliness)
+                    return
+                elif api_field == "cleanliness_level":
+                    await message.answer("Хорошо! Опишите ваш режим сна (например, 'жаворонок', 'сова'):")
+                    await state.set_state(ProfileStates.edit_sleep)
+                    return
+                elif api_field == "sleep_habits":
+                    await message.answer("Укажите ваш бюджет на аренду (число в рублях):")
+                    await state.set_state(ProfileStates.edit_budget)
+                    return
+                elif api_field == "rent_budget":
+                    await message.answer("Укажите предпочтительный район поиска:")
+                    await state.set_state(ProfileStates.edit_location)
+                    return
+                elif api_field == "location":
+                    await message.answer("Укажите ваше отношение к курению:")
+                    await state.set_state(ProfileStates.edit_smoking)
+                    return
+                elif api_field == "smoking_preference":
+                    await message.answer("Укажите ваше отношение к домашним животным:")
+                    await state.set_state(ProfileStates.edit_pets)
+                    return
+                elif api_field == "pet_preference":
+                    await message.answer("Укажите ваш username в Telegram (без @):")
+                    await state.set_state(ProfileStates.edit_telegram_username)
+                    return
+                elif api_field == "telegram_username":
+                    await message.answer(
+                        "✅ Базовый профиль заполнен! Теперь вы можете искать соседей.",
+                        reply_markup=get_main_menu_keyboard()
+                    )
+                    await state.clear()
+                    return
+
+            # Regular profile editing
+            await message.answer("✅ Информация обновлена!")
+            await show_profile(message, state)
+            await state.clear()
+
+        except Exception as e:
+            logger.error(f"Error updating user profile: {e}")
+            await message.answer("Произошла ошибка при обновлении профиля. Пожалуйста, попробуйте еще раз.")
+            await session.rollback()
+
+
+async def gender_callback(callback: types.CallbackQuery, state: FSMContext):
+    gender = callback.data.split("_")[1]
+
+    if gender == "male":
+        gender_value = "Мужской"
+    elif gender == "female":
+        gender_value = "Женский"
+    else:
+        gender_value = "Другой"
+
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    async with postgres_helper.session_factory() as session:
+        user = await session.get(User, user_id)
+        user.gender = gender_value
+        await session.commit()
+
+    # Check if this is part of the initial setup
+    is_onboarding = user_data.get("edit_field") is None
+
+    if is_onboarding:
+        await callback.message.answer("Отлично! Теперь укажите вашу профессию:")
+        await state.set_state(ProfileStates.edit_occupation)
+    else:
+        await callback.message.answer("✅ Пол успешно обновлен!")
+        await show_profile(callback.message, state)
+        await state.clear()
+
+    await callback.answer()
+
+
+async def accommodation_callback(callback: types.CallbackQuery, state: FSMContext):
+    option = callback.data.split("_")[1]
+
+    option_map = {
+        "apartment": "apartment",
+        "dormitory": "dormitory",
+        "no_preference": "no_preference"
+    }
+
+    accommodation_value = option_map.get(option)
+
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    async with postgres_helper.session_factory() as session:
+        user = await session.get(User, user_id)
+        user.accommodation_preference = accommodation_value
+        await session.commit()
+
+    # Check if this is part of the initial setup
+    is_onboarding = user_data.get("edit_field") is None
+
+    if is_onboarding:
+        await callback.message.answer("Хорошо! Теперь расскажите немного о себе:")
+        await state.set_state(ProfileStates.edit_bio)
+    else:
+        await callback.message.answer("✅ Предпочтения по жилью обновлены!")
+        await show_profile(callback.message, state)
+        await state.clear()
+
+    await callback.answer()
+
+
+async def process_interests_edit(callback: types.CallbackQuery, state: FSMContext):
+    if callback.data == "interests_done":
+        user_data = await state.get_data()
+        user_id = user_data.get("user_id")
+        interests = user_data.get("selected_interests", [])
+
+        async with postgres_helper.session_factory() as session:
+            user = await session.get(User, user_id)
+            user.interests = interests
+            await session.commit()
+
+        await callback.message.answer("✅ Интересы обновлены!")
+        await show_profile(callback.message, state)
+        await state.clear()
+    else:
+        interest = callback.data.replace("interest_", "")
+        user_data = await state.get_data()
+        interests = user_data.get("selected_interests", [])
+
+        if interest in interests:
+            interests.remove(interest)
+        else:
+            interests.append(interest)
+
+        await state.update_data(selected_interests=interests)
+
+        selected_text = ", ".join(interests) if interests else "Нет выбранных интересов"
+        await callback.message.edit_text(
+            f"Выберите ваши интересы:\n\nВыбрано: {selected_text}",
+            reply_markup=get_interests_keyboard(interests)
+        )
+
+    await callback.answer()
+
+
+def register_profile_handlers(dp):
+    dp.include_router(router)
+
+    router.message.register(show_profile, Command("profile"))
+    router.callback_query.register(edit_profile_callback, F.data.startswith("edit_"))
+    router.callback_query.register(gender_callback, F.data.startswith("gender_"))
+    router.callback_query.register(accommodation_callback, F.data.startswith("accommodation_"))
+    router.callback_query.register(process_interests_edit, F.data.startswith("interest_"))
+
+    # Register handlers for all profile states
+    for state in ProfileStates:
+        if state not in [ProfileStates.edit_interests, ProfileStates.edit_gender, ProfileStates.edit_accommodation]:
+            router.message.register(process_profile_edit, state)
+
+# ./bot/handlers/__init__.py
+# bot/handlers/__init__.py
+from aiogram import Dispatcher
+
+from bot.handlers.start import register_start_handlers
+from bot.handlers.profile import register_profile_handlers
+from bot.handlers.search import register_search_handlers
+from bot.handlers.matches import register_matches_handlers
+from bot.handlers.ai_chat import register_ai_chat_handlers
+from bot.handlers.menu import register_menu_handlers
+from bot.handlers.notifications import register_notifications_handlers
+
+
+def register_all_handlers(dp: Dispatcher):
+    handlers = [
+        register_start_handlers,
+        register_profile_handlers,
+        register_search_handlers,
+        register_matches_handlers,
+        register_ai_chat_handlers,
+        register_menu_handlers,
+        register_notifications_handlers,  # Added notifications handlers
+    ]
+
+    for handler in handlers:
+        handler(dp)
+
+# ./bot/handlers/start.py
+# bot/handlers/start.py
+import uuid
+import logging
+from aiogram import Router, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from sqlalchemy import select, text, or_
+from sqlalchemy.exc import IntegrityError
+
+from bot.handlers.notifications import check_notifications
+from bot.states.profile_states import ProfileStates
+from bot.keyboards.profile_kb import get_profile_keyboard
+from src.api_v1.auth.crud import get_password_hash
+from src.core.database import User, postgres_helper
+
+router = Router()
+logger = logging.getLogger(__name__)
+
+
+async def start_command(message: types.Message, state: FSMContext):
+    logger.info(f"Starting command for user {message.from_user.id}")
+
+    # Get user from database or create one
+    async with postgres_helper.session_factory() as session:
+        # Check if user already exists based on telegram_id
+        tg_id = str(message.from_user.id)
+
+        # First try to find by username which is faster and more reliable
+        username = f"tg_{message.from_user.id}"
+        query = select(User).where(User.username == username)
+        result = await session.execute(query)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            # Then try to find by telegram_id in metadata using raw SQL for reliable JSON querying
+            query = text("SELECT * FROM users WHERE user_metadata->>'telegram_id' = :tg_id")
+            result = await session.execute(query, {"tg_id": tg_id})
+            user_row = result.fetchone()
+
+            if user_row:
+                # Found user by telegram_id, get the full user object
+                user = await session.get(User, user_row[0])
+
+        user_is_new = False
+        if not user:
+            # User doesn't exist, create a new one
+            user_is_new = True
+            try:
+                # Generate username and random password
+                username = f"tg_{message.from_user.id}"
+                email = f"{username}@telegram.user"
+                password = str(uuid.uuid4())
+                hashed_password = get_password_hash(password)
+
+                # Create new user
+                new_user = User(
+                    username=username,
+                    email=email,
+                    hashed_password=hashed_password,
+                    name=message.from_user.first_name,
+                    is_active=True,
+                    # Store telegram_id in user_metadata field
+                    user_metadata={"telegram_id": tg_id}
+                )
+
+                session.add(new_user)
+                await session.commit()
+                await session.refresh(new_user)
+                user = new_user
+
+                logger.info(f"Created new user {username} for Telegram ID {tg_id}")
+
+            except IntegrityError as e:
+                # User might have been created in a race condition, try to find them again
+                await session.rollback()
+                logger.warning(f"IntegrityError when creating user: {e}")
+
+                # Try to find the user one more time
+                query = select(User).where(
+                    or_(
+                        User.username == username,
+                        User.email == f"{username}@telegram.user"
+                    )
+                )
+                result = await session.execute(query)
+                user = result.scalar_one_or_none()
+
+                if not user:
+                    # Still not found, generate a unique username with timestamp
+                    import time
+                    timestamp = int(time.time())
+                    username = f"tg_{message.from_user.id}_{timestamp}"
+                    email = f"{username}@telegram.user"
+                    password = str(uuid.uuid4())
+                    hashed_password = get_password_hash(password)
+
+                    new_user = User(
+                        username=username,
+                        email=email,
+                        hashed_password=hashed_password,
+                        name=message.from_user.first_name,
+                        is_active=True,
+                        user_metadata={"telegram_id": tg_id}
+                    )
+
+                    session.add(new_user)
+                    await session.commit()
+                    await session.refresh(new_user)
+                    user = new_user
+                    user_is_new = True
+                    logger.info(f"Created new user with timestamp {username} after handling IntegrityError")
+
+        # Store user ID in state
+        await state.update_data(user_id=user.id, is_onboarding=user_is_new)
+
+        # Explicitly check if profile info is missing
+        is_profile_incomplete = (
+                user.age is None or
+                user.gender is None or
+                user.occupation is None or
+                user.cleanliness_level is None or
+                user.rent_budget is None
+        )
+
+        logger.info(f"User {user.id}: is_new={user_is_new}, profile_incomplete={is_profile_incomplete}")
+
+        # If new user or incomplete profile, start onboarding
+        if user_is_new or is_profile_incomplete:
+            await message.answer(
+                f"👋 Привет, {user.name or message.from_user.first_name}!\n\n"
+                "Давайте заполним ваш профиль, чтобы найти идеальных соседей для совместной аренды."
+            )
+
+            # Start profile setup with the first missing field
+            if user.age is None:
+                await message.answer(
+                    "Для начала, укажите ваш возраст (число):",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_age)
+            elif user.gender is None:
+                from bot.keyboards.profile_kb import get_gender_keyboard
+                await message.answer(
+                    "Укажите ваш пол:",
+                    reply_markup=get_gender_keyboard()
+                )
+                await state.set_state(ProfileStates.edit_gender)
+            elif user.occupation is None:
+                await message.answer(
+                    "Укажите вашу профессию:",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_occupation)
+            elif user.cleanliness_level is None:
+                await message.answer(
+                    "Оцените уровень вашей чистоплотности от 1 до 5:",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_cleanliness)
+            elif user.rent_budget is None:
+                await message.answer(
+                    "Укажите ваш бюджет на аренду (число в рублях):",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_budget)
+            else:
+                # Continue with other fields as needed
+                await message.answer(
+                    "Продолжим заполнение профиля. Расскажите о себе:",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+                await state.set_state(ProfileStates.edit_bio)
+
+        else:
+            # Returning user with complete profile
+            await message.answer(
+                f"👋 С возвращением, {user.name or message.from_user.first_name}!"
+            )
+
+            # Show main menu
+            from bot.keyboards.main_kb import get_main_menu_keyboard
+            await message.answer(
+                "Что вы хотите сделать?",
+                reply_markup=get_main_menu_keyboard()
+            )
+    await check_notifications(user.id, message.bot)
+
+
+def register_start_handlers(dp):
+    dp.include_router(router)
+    router.message.register(start_command, Command("start"))
+
+# ./bot/handlers/menu.py
+# bot/handlers/menu.py
+from aiogram import Router, F, types
+from aiogram.fsm.context import FSMContext
+
+from bot.handlers.profile import show_profile
+from bot.handlers.search import start_search
+from bot.handlers.matches import show_matches
+from bot.handlers.ai_chat import start_ai_chat
+from bot.keyboards.main_kb import get_main_menu_keyboard
+
+router = Router()
+
+
+async def show_main_menu(message: types.Message):
+    await message.answer(
+        "Главное меню. Выберите действие:",
+        reply_markup=get_main_menu_keyboard()
+    )
+
+
+async def return_to_menu_callback(callback: types.CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(
+        "Главное меню. Выберите действие:",
+        reply_markup=get_main_menu_keyboard()
+    )
+
+
+async def show_profile_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await show_profile(callback.message, state)
+
+
+async def start_search_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await start_search(callback.message, state)
+
+
+async def show_matches_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await show_matches(callback.message, state)
+
+
+async def start_ai_chat_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await start_ai_chat(callback.message, state)
+
+
+def register_menu_handlers(dp):
+    dp.include_router(router)
+
+    router.callback_query.register(return_to_menu_callback, F.data == "return_to_menu")
+    router.callback_query.register(show_profile_callback, F.data == "show_profile")
+    router.callback_query.register(start_search_callback, F.data == "start_search")
+    router.callback_query.register(show_matches_callback, F.data == "show_matches")
+    router.callback_query.register(start_ai_chat_callback, F.data == "start_ai_chat")
+
+# ./bot/handlers/search.py
+# bot/handlers/search.py
+import logging
+from aiogram import Router, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from sqlalchemy import select, and_, not_, or_
+
+from bot.keyboards.search_kb import get_roommate_keyboard, get_compatibility_keyboard
+from bot.keyboards.main_kb import get_main_menu_keyboard
+from src.core.database import User, postgres_helper, Like, Match
+from src.core.database.alchemy_models.like import LikeStatus
+from src.api_v1.like.crud import create_like
+from src.core.utils.AIMatchingService import ai_matching_service
+from bot.handlers.notifications import check_notifications
+
+router = Router()
+logger = logging.getLogger(__name__)
+
+
+async def start_search(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if not user_id:
+        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        return
+
+    # Get potential roommates
+    async with postgres_helper.session_factory() as session:
+        # Get current user
+        current_user = await session.get(User, user_id)
+
+        # First, get all matches to exclude
+        query = select(Match).where(
+            or_(
+                Match.user1_id == user_id,
+                Match.user2_id == user_id
+            )
+        )
+        result = await session.execute(query)
+        matches = result.scalars().all()
+
+        matched_ids = []
+        for match in matches:
+            if match.user1_id == user_id:
+                matched_ids.append(match.user2_id)
+            else:
+                matched_ids.append(match.user1_id)
+
+        # Get all likes already sent
+        query = select(Like).where(
+            Like.liker_id == user_id
+        )
+        result = await session.execute(query)
+        likes_sent = result.scalars().all()
+
+        liked_ids = [like.liked_id for like in likes_sent]
+
+        # Get all users except current user and those already matched or liked
+        exclude_ids = matched_ids + liked_ids + [user_id]
+        query = select(User).where(
+            and_(
+                not_(User.id.in_(exclude_ids)),
+                User.is_active == True
+            )
+        )
+        result = await session.execute(query)
+        roommates = result.scalars().all()
+
+        roommates_data = []
+        for roommate in roommates:
+            roommates_data.append({
+                "id": roommate.id,
+                "name": roommate.name,
+                "age": roommate.age,
+                "gender": roommate.gender,
+                "occupation": roommate.occupation,
+                "bio": roommate.bio,
+                "interests": roommate.interests or [],  # Ensure interests is a list
+                "cleanliness_level": roommate.cleanliness_level,
+                "sleep_habits": roommate.sleep_habits,
+                "rent_budget": roommate.rent_budget,
+                "location": roommate.location,
+                "smoking_preference": roommate.smoking_preference,
+                "pet_preference": roommate.pet_preference
+            })
+
+    if not roommates_data:
+        await message.answer(
+            "🔍 На данный момент нет подходящих соседей. Попробуйте позже.",
+            reply_markup=get_main_menu_keyboard()
+        )
+        return
+
+    await state.update_data(roommates=roommates_data, current_index=0)
+    await show_roommate(message, state)
+
+
+async def show_roommate(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    roommates = user_data.get("roommates", [])
+    current_index = user_data.get("current_index", 0)
+
+    if not roommates or current_index >= len(roommates):
+        await message.answer(
+            "🔍 Вы просмотрели всех потенциальных соседей. Попробуйте позже.",
+            reply_markup=get_main_menu_keyboard()
+        )
+        return
+
+    roommate = roommates[current_index]
+
+    # Ensure interests is an iterable list
+    interests = roommate.get('interests', [])
+    if not interests or not isinstance(interests, (list, tuple)):
+        interests = ['Не указано']
+
+    # Check if other fields are None and provide default values
+    name = roommate.get('name') or 'Не указано'
+    age = roommate.get('age') or 'Не указано'
+    gender = roommate.get('gender') or 'Не указано'
+    occupation = roommate.get('occupation') or 'Не указано'
+    cleanliness = roommate.get('cleanliness_level') or 'Не указано'
+    sleep_habits = roommate.get('sleep_habits') or 'Не указано'
+    rent_budget = roommate.get('rent_budget') or 'Не указано'
+    location = roommate.get('location') or 'Не указано'
+    smoking = roommate.get('smoking_preference') or 'Не указано'
+    pets = roommate.get('pet_preference') or 'Не указано'
+    bio = roommate.get('bio') or 'Не указано'
+
+    profile_text = (
+        f"👤 *Потенциальный сосед*\n\n"
+        f"*Имя:* {name}\n"
+        f"*Возраст:* {age}\n"
+        f"*Пол:* {gender}\n"
+        f"*Профессия:* {occupation}\n"
+        f"*Уровень чистоплотности:* {cleanliness}/5\n"
+        f"*Режим сна:* {sleep_habits}\n"
+        f"*Бюджет на аренду:* {rent_budget} ₽\n"
+        f"*Район поиска:* {location}\n"
+        f"*Отношение к курению:* {smoking}\n"
+        f"*Отношение к животным:* {pets}\n\n"
+        f"*О себе:*\n{bio}\n\n"
+        f"*Интересы:*\n{', '.join(interests)}"
+    )
+
+    await message.answer(profile_text, reply_markup=get_roommate_keyboard(roommate.get('id')))
+
+
+async def check_compatibility(callback: types.CallbackQuery, state: FSMContext):
+    roommate_id = int(callback.data.split("_")[1])
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    async with postgres_helper.session_factory() as session:
+        current_user = await session.get(User, user_id)
+        roommate = await session.get(User, roommate_id)
+
+        if not current_user or not roommate:
+            await callback.message.answer("Не удалось получить данные пользователей.")
+            await callback.answer()
+            return
+
+        # Use AI service to calculate compatibility
+        score, explanation = ai_matching_service.calculate_compatibility_score(current_user, roommate)
+
+        compatibility_text = (
+            f"📊 *Результат анализа совместимости*\n\n"
+            f"*Ваша совместимость с {roommate.name}:* {score:.1f}%\n\n"
+            f"*Анализ:*\n{explanation}"
+        )
+
+        await callback.message.answer(compatibility_text, reply_markup=get_compatibility_keyboard(roommate_id))
+
+    await callback.answer()
+
+
+async def roommate_action(callback: types.CallbackQuery, state: FSMContext):
+    action, roommate_id = callback.data.split("_")[1:]
+    roommate_id = int(roommate_id)
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if action == "like":
+        # Like roommate
+        async with postgres_helper.session_factory() as session:
+            like, is_match, notification = await create_like(
+                session=session,
+                liker_id=user_id,
+                liked_id=roommate_id
+            )
+
+            if is_match:
+                await callback.message.answer(
+                    "✅ Совпадение! Вы можете начать общение с этим пользователем."
+                )
+
+                # Send notification to the other person about the match
+                # The create_like function already creates a notification in the database,
+                # but we need to trigger sending it via Telegram
+                await check_notifications(roommate_id, callback.bot)
+            else:
+                await callback.message.answer(
+                    "👍 Вы проявили интерес к этому пользователю."
+                )
+
+                # Send notification to the other person about the like
+                # Again, notification is already in database, just send it
+                await check_notifications(roommate_id, callback.bot)
+
+    # Move to next roommate
+    current_index = user_data.get("current_index", 0)
+    await state.update_data(current_index=current_index + 1)
+    await show_roommate(callback.message, state)
+    await callback.answer()
+
+
+async def back_to_profile_callback(callback: types.CallbackQuery, state: FSMContext):
+    roommate_id = int(callback.data.split("_")[3])
+    await callback.answer()
+
+    # Show roommate profile again
+    user_data = await state.get_data()
+    roommates = user_data.get("roommates", [])
+    current_index = user_data.get("current_index", 0)
+
+    if not roommates or current_index >= len(roommates):
+        await callback.message.answer(
+            "Не удалось отобразить профиль. Попробуйте /search.",
+            reply_markup=get_main_menu_keyboard()
+        )
+        return
+
+    roommate = roommates[current_index]
+
+    # Ensure interests is an iterable list
+    interests = roommate.get('interests', [])
+    if not interests or not isinstance(interests, (list, tuple)):
+        interests = ['Не указано']
+
+    # Check if other fields are None and provide default values
+    name = roommate.get('name') or 'Не указано'
+    age = roommate.get('age') or 'Не указано'
+    gender = roommate.get('gender') or 'Не указано'
+    occupation = roommate.get('occupation') or 'Не указано'
+    cleanliness = roommate.get('cleanliness_level') or 'Не указано'
+    sleep_habits = roommate.get('sleep_habits') or 'Не указано'
+    rent_budget = roommate.get('rent_budget') or 'Не указано'
+    location = roommate.get('location') or 'Не указано'
+    smoking = roommate.get('smoking_preference') or 'Не указано'
+    pets = roommate.get('pet_preference') or 'Не указано'
+    bio = roommate.get('bio') or 'Не указано'
+
+    profile_text = (
+        f"👤 *Потенциальный сосед*\n\n"
+        f"*Имя:* {name}\n"
+        f"*Возраст:* {age}\n"
+        f"*Пол:* {gender}\n"
+        f"*Профессия:* {occupation}\n"
+        f"*Уровень чистоплотности:* {cleanliness}/5\n"
+        f"*Режим сна:* {sleep_habits}\n"
+        f"*Бюджет на аренду:* {rent_budget} ₽\n"
+        f"*Район поиска:* {location}\n"
+        f"*Отношение к курению:* {smoking}\n"
+        f"*Отношение к животным:* {pets}\n\n"
+        f"*О себе:*\n{bio}\n\n"
+        f"*Интересы:*\n{', '.join(interests)}"
+    )
+
+    await callback.message.answer(profile_text, reply_markup=get_roommate_keyboard(roommate.get('id')))
+
+
+def register_search_handlers(dp):
+    dp.include_router(router)
+
+    router.message.register(start_search, Command("search"))
+    router.callback_query.register(roommate_action, F.data.startswith("roommate_"))
+    router.callback_query.register(check_compatibility, F.data.startswith("compatibility_"))
+    router.callback_query.register(back_to_profile_callback, F.data.startswith("back_to_profile_"))
+
+# ./bot/handlers/notifications.py
+# bot/handlers/notifications.py
+import logging
+from aiogram import Router, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from sqlalchemy import select, update, text
+
+from src.core.database import User, postgres_helper, Notification
+from src.core.database.alchemy_models.notification import NotificationType
+from bot.keyboards.main_kb import get_main_menu_keyboard
+from bot.keyboards.matches_kb import get_match_actions_keyboard
+
+router = Router()
+logger = logging.getLogger(__name__)
+
+
+async def check_notifications(user_id: int, bot):
+    """Check and send pending notifications for a user"""
+    try:
+        async with postgres_helper.session_factory() as session:
+            # Get unread notifications
+            query = select(Notification).where(
+                (Notification.user_id == user_id) &
+                (Notification.is_read == False)
+            ).order_by(Notification.timestamp.desc())
+
+            result = await session.execute(query)
+            notifications = result.scalars().all()
+
+            if not notifications:
+                return  # No notifications to send
+
+            # Get user's Telegram ID from user_metadata
+            query = text("SELECT user_metadata->>'telegram_id' AS telegram_id FROM users WHERE id = :user_id")
+            result = await session.execute(query, {"user_id": user_id})
+            row = result.fetchone()
+
+            if not row or not row[0]:
+                logger.warning(f"Cannot send notification: User {user_id} has no Telegram ID")
+                return
+
+            telegram_id = row[0]
+
+            # Send notifications
+            for notification in notifications:
+                # Format notification message based on type
+                if notification.type == NotificationType.NEW_LIKE:
+                    # Get liker's name
+                    if notification.related_user_id:
+                        liker = await session.get(User, notification.related_user_id)
+                        if liker:
+                            liker_name = liker.name or "Пользователь"
+                            liker_age = f", {liker.age}" if liker.age else ""
+                            liker_gender = f", {liker.gender}" if liker.gender else ""
+                            liker_info = f"{liker_name}{liker_age}{liker_gender}"
+                        else:
+                            liker_info = "Кто-то"
+                    else:
+                        liker_info = "Кто-то"
+
+                    message = (
+                        f"❤️ *У вас новый лайк!*\n\n"
+                        f"{liker_info} проявил(а) интерес к вам!\n\n"
+                        f"Посмотрите вкладку \"Мои совпадения\", чтобы узнать больше."
+                    )
+
+                    # Create keyboard with direct link to matches
+                    keyboard = types.InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [types.InlineKeyboardButton(text="👀 Посмотреть совпадения", callback_data="show_matches")]
+                        ]
+                    )
+
+                elif notification.type == NotificationType.MATCH_CREATED:
+                    # Get match partner's name
+                    if notification.related_user_id:
+                        partner = await session.get(User, notification.related_user_id)
+                        if partner:
+                            partner_name = partner.name or "Пользователь"
+                            partner_age = f", {partner.age}" if partner.age else ""
+                            partner_gender = f", {partner.gender}" if partner.gender else ""
+                            partner_info = f"{partner_name}{partner_age}{partner_gender}"
+                        else:
+                            partner_info = "Кто-то"
+                    else:
+                        partner_info = "Кто-то"
+
+                    message = (
+                        f"✨ *У вас новое совпадение!*\n\n"
+                        f"Вы и {partner_info} проявили взаимный интерес друг к другу!\n"
+                        f"Теперь вы можете начать общение и обсудить возможность совместной аренды жилья."
+                    )
+
+                    # Create keyboard with direct link to matches
+                    keyboard = types.InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [types.InlineKeyboardButton(text="💬 Посмотреть совпадения", callback_data="show_matches")]
+                        ]
+                    )
+
+                else:
+                    # Generic notification
+                    message = notification.content
+                    keyboard = get_main_menu_keyboard()
+
+                # Send notification to user
+                try:
+                    await bot.send_message(
+                        chat_id=telegram_id,
+                        text=message,
+                        reply_markup=keyboard,
+                        parse_mode="Markdown"
+                    )
+
+                    # Mark notification as read
+                    notification.is_read = True
+                except Exception as e:
+                    logger.error(f"Failed to send notification to {telegram_id}: {e}")
+
+            # Commit changes to mark notifications as read
+            if notifications:
+                await session.commit()
+                logger.info(f"Sent {len(notifications)} notifications to user {user_id}")
+
+    except Exception as e:
+        logger.error(f"Error in check_notifications: {e}")
+
+
+async def show_notification_list(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+
+    if not user_id:
+        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        return
+
+    async with postgres_helper.session_factory() as session:
+        query = select(Notification).where(
+            Notification.user_id == user_id
+        ).order_by(Notification.timestamp.desc()).limit(10)
+
+        result = await session.execute(query)
+        notifications = result.scalars().all()
+
+        if not notifications:
+            await message.answer(
+                "У вас нет уведомлений.",
+                reply_markup=get_main_menu_keyboard()
+            )
+            return
+
+        notification_text = "📬 *Ваши последние уведомления:*\n\n"
+
+        for i, notification in enumerate(notifications, 1):
+            # Format based on type
+            if notification.type == NotificationType.NEW_LIKE:
+                type_text = "❤️ Новый лайк"
+            elif notification.type == NotificationType.MATCH_CREATED:
+                type_text = "✨ Новое совпадение"
+            else:
+                type_text = "📝 Уведомление"
+
+            # Format timestamp
+            timestamp = notification.timestamp.strftime("%d.%m.%Y %H:%M")
+
+            # Add read/unread status
+            status = "👁️ Просмотрено" if notification.is_read else "🆕 Новое"
+
+            notification_text += f"{i}. {type_text} - {timestamp} ({status})\n{notification.content}\n\n"
+
+        await message.answer(
+            notification_text,
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode="Markdown"
+        )
+
+
+def register_notifications_handlers(dp):
+    dp.include_router(router)
+
+    router.message.register(show_notification_list, Command("notifications"))
+
+# ./bot/services/ai_service.py
+import json
+from typing import Dict, Any, Optional
+
+from yandex_cloud_ml_sdk import YCloudML
+
+from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
+
+# Initialize YandexGPT
+sdk = YCloudML(
+    folder_id=YANDEX_FOLDER_ID,
+    auth=YANDEX_API_KEY
+)
+model = sdk.models.completions('yandexgpt-lite')
+model.configure(
+    temperature=0.5,
+    max_tokens=2000,
+)
+
+
+async def get_ai_response(query: str, user_profile: Optional[Dict[str, Any]] = None) -> str:
+    system_prompt = """
+    Ты - полезный ассистент по бытовым вопросам для соседей по квартире.
+    Ты помогаешь с решением бытовых проблем, организацией пространства, уборкой, 
+    готовкой, разрешением конфликтов между соседями по квартире и другими домашними вопросами.
+    Всегда давай конкретные и практичные советы с учетом информации о пользователе.
+    """
+
+    user_context = ""
+    if user_profile:
+        user_context = f"""
+        Вот информация о пользователе:
+        - Имя: {user_profile.get('name', 'Неизвестно')}
+        - Возраст: {user_profile.get('age', 'Неизвестно')}
+        - Пол: {user_profile.get('gender', 'Неизвестно')}
+        - Чистоплотность (1-5): {user_profile.get('cleanliness_level', 'Неизвестно')}
+        - Режим сна: {user_profile.get('sleep_habits', 'Неизвестно')}
+        - Отношение к курению: {user_profile.get('smoking_preference', 'Неизвестно')}
+        - Отношение к животным: {user_profile.get('pet_preference', 'Неизвестно')}
+        - Интересы: {', '.join(user_profile.get('interests', ['Неизвестно']))}
+
+        Используй эту информацию, чтобы дать персонализированный совет.
+        """
+
+    user_prompt = f"{user_context}\n\nВопрос: {query}"
+
+    messages = [
+        {'role': 'system', 'text': system_prompt},
+        {'role': 'user', 'text': user_prompt},
+    ]
+
+    try:
+        operation = model.run_deferred(messages)
+        result = operation.wait()
+        return result.text
+    except Exception as e:
+        return f"Извините, произошла ошибка при обработке вашего запроса: {str(e)}"
+
+
+# ./bot/services/database.py
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.database import postgres_helper
+
+
+async def init_db():
+    # Just use the existing database connection from src
+    pass
+
+
+async def get_session() -> AsyncSession:
+    async with postgres_helper.session_factory() as session:
+        yield session
+
+
+# ./bot/services/__init__.py
+
+
+# ./bot/services/match_service.py
+import aiohttp
+from typing import Dict, Any, List, Tuple, Optional
+
+BASE_URL = "http://127.0.0.1:8000/api/v1"  # Or your actual API URL
+
+
+async def get_potential_roommates(token: str) -> List[Dict[str, Any]]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.get(f"{BASE_URL}/users/roommates", headers=headers) as response:
+                if response.status == 200:
+                    return await response.json()
+                return []
+        except Exception:
+            return []
+
+
+async def get_smart_matches(token: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.get(
+                    f"{BASE_URL}/ai-matching/smart-matches?limit={limit}",
+                    headers=headers
+            ) as response:
+                if response.status == 200:
+                    response_data = await response.json()
+                    return response_data.get("matches", [])
+                return []
+        except Exception:
+            return []
+
+
+async def get_compatibility_score(token: str, user_id: int) -> Tuple[float, str]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.get(
+                    f"{BASE_URL}/ai-matching/{user_id}/compatibility",
+                    headers=headers
+            ) as response:
+                if response.status == 200:
+                    response_data = await response.json()
+                    return response_data.get("score", 0), response_data.get("explanation", "")
+                return 0, "Не удалось получить информацию о совместимости"
+        except Exception:
+            return 0, "Произошла ошибка при запросе информации о совместимости"
+
+
+async def like_roommate(token: str, liked_id: int) -> Tuple[bool, bool]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.post(
+                    f"{BASE_URL}/likes",
+                    headers=headers,
+                    json={"liked_id": liked_id}
+            ) as response:
+                if response.status == 201:
+                    response_data = await response.json()
+                    # Check if it's a match (status is "accepted")
+                    is_match = response_data.get("status") == "accepted"
+                    return True, is_match
+                return False, False
+        except Exception:
+            return False, False
+
+
+async def get_matches(token: str) -> List[Dict[str, Any]]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.get(f"{BASE_URL}/matches/", headers=headers) as response:
+                if response.status == 200:
+                    return await response.json()
+                return []
+        except Exception:
+            return []
+
+
+async def get_likes_received(token: str, status=None) -> List[Dict[str, Any]]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            url = f"{BASE_URL}/likes/received"
+            if status:
+                url += f"?status={status}"
+
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    return await response.json()
+                return []
+        except Exception:
+            return []
+
+
+async def respond_to_like(token: str, like_id: int, accept: bool) -> bool:
+    action = "accept" if accept else "decline"
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.post(
+                    f"{BASE_URL}/likes/{like_id}/respond",
+                    headers=headers,
+                    json={"action": action}
+            ) as response:
+                return response.status == 200
+        except Exception:
+            return False
+
+
+# ./bot/services/user_service.py
+import aiohttp
+import json
+from typing import Dict, Any, Tuple, Optional
+
+BASE_URL = "http://127.0.0.1:8000/api/v1"  # Or your actual API URL
+
+
+async def check_user_exists(username: str) -> bool:
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(
+                    f"{BASE_URL}/auth/register",
+                    json={"username": username, "email": "temp@example.com", "password": "temppass"}
+            ) as response:
+                return response.status == 400
+        except Exception:
+            return False
+
+
+async def register_user(username: str, email: str, password: str) -> bool:
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(
+                    f"{BASE_URL}/auth/register",
+                    json={"username": username, "email": email, "password": password}
+            ) as response:
+                return response.status == 201
+        except Exception:
+            return False
+
+
+async def login_user(username: str, password: str) -> Tuple[bool, Optional[str]]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            # Using form data for OAuth2 login
+            data = {"username": username, "password": password}
+            async with session.post(f"{BASE_URL}/auth/login", data=data) as response:
+                if response.status == 200:
+                    response_data = await response.json()
+                    return True, response_data.get("access_token")
+                return False, None
+        except Exception:
+            return False, None
+
+
+async def get_user_profile(token: str) -> Optional[Dict[str, Any]]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.get(f"{BASE_URL}/users/me", headers=headers) as response:
+                if response.status == 200:
+                    return await response.json()
+                return None
+        except Exception:
+            return None
+
+
+async def update_user_profile(token: str, profile_data: Dict[str, Any]) -> bool:
+    async with aiohttp.ClientSession() as session:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.put(
+                    f"{BASE_URL}/users/me",
+                    headers=headers,
+                    json=profile_data
+            ) as response:
+                return response.status == 200
+        except Exception:
+            return False
 
 
 # ./docker-compose.yml
@@ -1404,10 +3565,19 @@ async def get_compatibility_score(
     return CompatibilityScore(score=score, explanation=explanation)
 
 # ./src/core/database/alchemy_models/user.py
-from sqlalchemy import Integer, String, Boolean, Float, ARRAY
+# src/core/database/alchemy_models/user.py
+from sqlalchemy import Integer, String, Boolean, Float, ARRAY, Enum
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
+import enum
 
 from src.core.database.alchemy_models.base import Base
+
+
+class AccommodationPreference(str, enum.Enum):
+    APARTMENT = "apartment"
+    DORMITORY = "dormitory"
+    NO_PREFERENCE = "no_preference"
 
 
 class User(Base):
@@ -1417,6 +3587,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     is_superuser: Mapped[bool] = mapped_column(default=False)
 
+    # Custom user metadata (for telegram info etc)
+    user_metadata: Mapped[dict] = mapped_column(JSON, nullable=True)
+
+    # Basic profile info
     name: Mapped[str] = mapped_column(nullable=True)
     age: Mapped[int] = mapped_column(Integer, nullable=True)
     gender: Mapped[str] = mapped_column(nullable=True)
@@ -1424,12 +3598,25 @@ class User(Base):
     avatar: Mapped[str] = mapped_column(nullable=True)
     bio: Mapped[str] = mapped_column(nullable=True)
     interests: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
+
+    # Living preferences
     cleanliness_level: Mapped[int] = mapped_column(Integer, nullable=True)
     sleep_habits: Mapped[str] = mapped_column(nullable=True)
     rent_budget: Mapped[int] = mapped_column(Integer, nullable=True)
     location: Mapped[str] = mapped_column(nullable=True)
     smoking_preference: Mapped[str] = mapped_column(nullable=True)
     pet_preference: Mapped[str] = mapped_column(nullable=True)
+
+    # New fields for education and accommodation
+    study_location: Mapped[str] = mapped_column(nullable=True)
+    study_program: Mapped[str] = mapped_column(nullable=True)
+    accommodation_preference: Mapped[str] = mapped_column(
+        Enum(AccommodationPreference, native_enum=False),
+        nullable=True
+    )
+
+    # Telegram contact info (for matches)
+    telegram_username: Mapped[str] = mapped_column(nullable=True)
 
 # ./src/core/database/alchemy_models/notification.py
 from datetime import datetime
@@ -1607,14 +3794,15 @@ from typing import List, Dict, Any, Tuple
 
 from yandex_cloud_ml_sdk import YCloudML
 
+from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
 from src.core.database.alchemy_models.user import User
 
 
 class AIMatchingService:
     def __init__(self):
         self.sdk = YCloudML(
-            folder_id=...,
-            auth=...,
+            folder_id=YANDEX_FOLDER_ID,
+            auth=YANDEX_API_KEY,
         )
         self.model = self.sdk.models.completions('yandexgpt-lite')
         self.model.configure(
@@ -1720,6 +3908,7 @@ class Settings(BaseSettings):
 
     yandex_folder_id: str
     yandex_api_key: str
+    telegram_bot_token: str
 
     model_config = SettingsConfigDict(env_file=".env")
 

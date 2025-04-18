@@ -1,4 +1,3 @@
-# bot/handlers/start.py
 import uuid
 import logging
 from aiogram import Router, F, types
@@ -7,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, text, or_
 from sqlalchemy.exc import IntegrityError
 
+from bot.handlers.notifications import check_notifications
 from bot.states.profile_states import ProfileStates
 from bot.keyboards.profile_kb import get_profile_keyboard
 from src.api_v1.auth.crud import get_password_hash
@@ -19,46 +19,37 @@ logger = logging.getLogger(__name__)
 async def start_command(message: types.Message, state: FSMContext):
     logger.info(f"Starting command for user {message.from_user.id}")
 
-    # Get user from database or create one
     async with postgres_helper.session_factory() as session:
-        # Check if user already exists based on telegram_id
         tg_id = str(message.from_user.id)
 
-        # First try to find by username which is faster and more reliable
         username = f"tg_{message.from_user.id}"
         query = select(User).where(User.username == username)
         result = await session.execute(query)
         user = result.scalar_one_or_none()
 
         if not user:
-            # Then try to find by telegram_id in metadata using raw SQL for reliable JSON querying
             query = text("SELECT * FROM users WHERE user_metadata->>'telegram_id' = :tg_id")
             result = await session.execute(query, {"tg_id": tg_id})
             user_row = result.fetchone()
 
             if user_row:
-                # Found user by telegram_id, get the full user object
                 user = await session.get(User, user_row[0])
 
         user_is_new = False
         if not user:
-            # User doesn't exist, create a new one
             user_is_new = True
             try:
-                # Generate username and random password
                 username = f"tg_{message.from_user.id}"
                 email = f"{username}@telegram.user"
                 password = str(uuid.uuid4())
                 hashed_password = get_password_hash(password)
 
-                # Create new user
                 new_user = User(
                     username=username,
                     email=email,
                     hashed_password=hashed_password,
                     name=message.from_user.first_name,
                     is_active=True,
-                    # Store telegram_id in user_metadata field
                     user_metadata={"telegram_id": tg_id}
                 )
 
@@ -70,11 +61,9 @@ async def start_command(message: types.Message, state: FSMContext):
                 logger.info(f"Created new user {username} for Telegram ID {tg_id}")
 
             except IntegrityError as e:
-                # User might have been created in a race condition, try to find them again
                 await session.rollback()
                 logger.warning(f"IntegrityError when creating user: {e}")
 
-                # Try to find the user one more time
                 query = select(User).where(
                     or_(
                         User.username == username,
@@ -85,7 +74,6 @@ async def start_command(message: types.Message, state: FSMContext):
                 user = result.scalar_one_or_none()
 
                 if not user:
-                    # Still not found, generate a unique username with timestamp
                     import time
                     timestamp = int(time.time())
                     username = f"tg_{message.from_user.id}_{timestamp}"
@@ -109,10 +97,8 @@ async def start_command(message: types.Message, state: FSMContext):
                     user_is_new = True
                     logger.info(f"Created new user with timestamp {username} after handling IntegrityError")
 
-        # Store user ID in state
         await state.update_data(user_id=user.id, is_onboarding=user_is_new)
 
-        # Explicitly check if profile info is missing
         is_profile_incomplete = (
                 user.age is None or
                 user.gender is None or
@@ -123,14 +109,12 @@ async def start_command(message: types.Message, state: FSMContext):
 
         logger.info(f"User {user.id}: is_new={user_is_new}, profile_incomplete={is_profile_incomplete}")
 
-        # If new user or incomplete profile, start onboarding
         if user_is_new or is_profile_incomplete:
             await message.answer(
                 f"👋 Привет, {user.name or message.from_user.first_name}!\n\n"
                 "Давайте заполним ваш профиль, чтобы найти идеальных соседей для совместной аренды."
             )
 
-            # Start profile setup with the first missing field
             if user.age is None:
                 await message.answer(
                     "Для начала, укажите ваш возраст (число):",
@@ -163,7 +147,6 @@ async def start_command(message: types.Message, state: FSMContext):
                 )
                 await state.set_state(ProfileStates.edit_budget)
             else:
-                # Continue with other fields as needed
                 await message.answer(
                     "Продолжим заполнение профиля. Расскажите о себе:",
                     reply_markup=types.ReplyKeyboardRemove()
@@ -171,17 +154,16 @@ async def start_command(message: types.Message, state: FSMContext):
                 await state.set_state(ProfileStates.edit_bio)
 
         else:
-            # Returning user with complete profile
             await message.answer(
                 f"👋 С возвращением, {user.name or message.from_user.first_name}!"
             )
 
-            # Show main menu
             from bot.keyboards.main_kb import get_main_menu_keyboard
             await message.answer(
                 "Что вы хотите сделать?",
                 reply_markup=get_main_menu_keyboard()
             )
+    await check_notifications(user.id, message.bot)
 
 
 def register_start_handlers(dp):

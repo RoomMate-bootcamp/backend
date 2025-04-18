@@ -5,7 +5,6 @@ from yandex_cloud_ml_sdk import YCloudML
 
 from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
 
-# Initialize YandexGPT
 sdk = YCloudML(
     folder_id=YANDEX_FOLDER_ID,
     auth=YANDEX_API_KEY
