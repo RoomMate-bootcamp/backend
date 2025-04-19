@@ -26,6 +26,7 @@ RUN pip install uvicorn[standard]
 # Copy the rest of app
 COPY src src
 COPY bot bot
+COPY run.py .
 COPY .env .env
 COPY alembic alembic
 COPY alembic.ini .
