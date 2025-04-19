@@ -6,8 +6,7 @@ from aiogram.fsm.strategy import FSMStrategy
 
 from bot.handlers import register_all_handlers
 from bot.middlewares import setup_middlewares
-from bot.config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_PATH, WEBAPP_HOST, WEBAPP_PORT
-from bot.services.database import init_db
+from bot.config import BOT_TOKEN
 from bot.handlers.notifications import check_notifications
 from src.core.database import postgres_helper
 from sqlalchemy import select, text
@@ -50,8 +49,6 @@ async def start_bot():
     setup_middlewares(dp)
 
     register_all_handlers(dp)
-
-    await init_db()
 
     asyncio.create_task(periodic_notification_check(bot))
 
