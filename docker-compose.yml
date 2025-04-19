@@ -22,7 +22,7 @@ services:
 
   bot:
     build: .
-    command: runuser -u uvicorn -- /venv/bin/python -m run.py
+    command: runuser -u uvicorn -- /venv/bin/python /build/run.py
     environment:
       - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/postgres-bootcamp
     depends_on:
