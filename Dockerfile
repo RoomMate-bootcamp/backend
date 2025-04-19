@@ -10,13 +10,15 @@ FROM base as poetry
 RUN pip install poetry==1.8.2
 COPY poetry.lock pyproject.toml ./
 RUN poetry export -o /requirements.txt --without-hashes
-RUN pip install asyncpg
+
 FROM base as common
 COPY --from=poetry /requirements.txt .
 # Create venv, add it to path and install requirements
 RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 RUN pip install -r requirements.txt
+# Explicitly install asyncpg here to ensure it's in the right environment
+RUN pip install asyncpg
 
 # Install uvicorn server
 RUN pip install uvicorn[standard]
