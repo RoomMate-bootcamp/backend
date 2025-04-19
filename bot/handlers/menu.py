@@ -12,16 +12,14 @@ router = Router()
 
 async def show_main_menu(message: types.Message):
     await message.answer(
-        "Главное меню. Выберите действие:",
-        reply_markup=get_main_menu_keyboard()
+        "Главное меню. Выберите действие:", reply_markup=get_main_menu_keyboard()
     )
 
 
 async def return_to_menu_callback(callback: types.CallbackQuery):
     await callback.answer()
     await callback.message.answer(
-        "Главное меню. Выберите действие:",
-        reply_markup=get_main_menu_keyboard()
+        "Главное меню. Выберите действие:", reply_markup=get_main_menu_keyboard()
     )
 
 

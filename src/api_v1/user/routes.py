@@ -14,16 +14,16 @@ users_router = APIRouter(prefix="/users", tags=["Users"])
 
 @users_router.get("/me", response_model=ProfileResponse)
 async def get_my_profile(
-        current_user: Annotated[User, Depends(get_current_active_user)]
+    current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     return current_user
 
 
 @users_router.put("/me", response_model=ProfileResponse)
 async def update_my_profile(
-        profile: ProfileUpdate,
-        current_user: Annotated[User, Depends(get_current_active_user)],
-        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+    profile: ProfileUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
     for key, value in profile.model_dump(exclude_unset=True).items():
         setattr(current_user, key, value)
@@ -36,8 +36,8 @@ async def update_my_profile(
 
 @users_router.get("/roommates", response_model=List[RoommateResponse])
 async def get_potential_roommates(
-        current_user: Annotated[User, Depends(get_current_active_user)],
-        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
 
     query = select(Match).where(
@@ -54,8 +54,7 @@ async def get_potential_roommates(
             matched_user_ids.append(match.user1_id)
 
     query = select(User).where(
-        (User.id != current_user.id) &
-        (~User.id.in_(matched_user_ids))
+        (User.id != current_user.id) & (~User.id.in_(matched_user_ids))
     )
     result = await session.execute(query)
     potential_roommates = result.scalars().all()

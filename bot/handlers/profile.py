@@ -4,8 +4,12 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from bot.states.profile_states import ProfileStates
-from bot.keyboards.profile_kb import get_profile_keyboard, get_gender_keyboard, get_interests_keyboard, \
-    get_accommodation_keyboard
+from bot.keyboards.profile_kb import (
+    get_profile_keyboard,
+    get_gender_keyboard,
+    get_interests_keyboard,
+    get_accommodation_keyboard,
+)
 from bot.keyboards.main_kb import get_main_menu_keyboard
 from src.core.database import User, postgres_helper
 
@@ -18,23 +22,29 @@ async def show_profile(message: types.Message, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if not user_id:
-        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        await message.answer(
+            "Пожалуйста, используйте /start для начала работы с ботом."
+        )
         return
 
     async with postgres_helper.session_factory() as session:
         user = await session.get(User, user_id)
 
         if not user:
-            await message.answer("Произошла ошибка при загрузке профиля. Используйте /start для перезапуска бота.")
+            await message.answer(
+                "Произошла ошибка при загрузке профиля. Используйте /start для перезапуска бота."
+            )
             return
 
         accommodation_map = {
             "apartment": "Квартира",
             "dormitory": "Общежитие",
-            "no_preference": "Не имеет значения"
+            "no_preference": "Не имеет значения",
         }
 
-        accommodation_text = accommodation_map.get(user.accommodation_preference, "Не указано")
+        accommodation_text = accommodation_map.get(
+            user.accommodation_preference, "Не указано"
+        )
 
         profile_text = (
             f"👤 *Ваш профиль*\n\n"
@@ -42,29 +52,26 @@ async def show_profile(message: types.Message, state: FSMContext):
             f"*Возраст:* {user.age or 'Не указано'}\n"
             f"*Пол:* {user.gender or 'Не указано'}\n"
             f"*Профессия:* {user.occupation or 'Не указано'}\n\n"
-
             f"*📚 Образование:*\n"
             f"*ВУЗ/Город учебы:* {user.study_location or 'Не указано'}\n"
             f"*Специальность:* {user.study_program or 'Не указано'}\n\n"
-
             f"*🏠 Жилищные предпочтения:*\n"
             f"*Предпочтение по жилью:* {accommodation_text}\n"
             f"*Бюджет на аренду:* {user.rent_budget or 'Не указано'} ₽\n"
             f"*Район поиска:* {user.location or 'Не указано'}\n\n"
-
             f"*⚙️ Личные привычки:*\n"
             f"*Уровень чистоплотности:* {user.cleanliness_level or 'Не указано'}/5\n"
             f"*Режим сна:* {user.sleep_habits or 'Не указано'}\n"
             f"*Отношение к курению:* {user.smoking_preference or 'Не указано'}\n"
             f"*Отношение к животным:* {user.pet_preference or 'Не указано'}\n\n"
-
             f"*Telegram username:* {user.telegram_username or 'Не указано'}\n\n"
-
             f"*О себе:*\n{user.bio or 'Не указано'}\n\n"
             f"*Интересы:*\n{', '.join(user.interests or ['Не указано'])}"
         )
 
-        await message.answer(profile_text, parse_mode="Markdown", reply_markup=get_profile_keyboard())
+        await message.answer(
+            profile_text, parse_mode="Markdown", reply_markup=get_profile_keyboard()
+        )
 
 
 async def edit_profile_callback(callback: types.CallbackQuery, state: FSMContext):
@@ -86,7 +93,7 @@ async def edit_profile_callback(callback: types.CallbackQuery, state: FSMContext
         "study_location": "Укажите ВУЗ или город, где вы учитесь/планируете учиться:",
         "study_program": "Укажите вашу специальность или направление обучения:",
         "accommodation": "Выберите предпочтительный вариант жилья:",
-        "telegram_username": "Укажите ваш username в Telegram (без @):"
+        "telegram_username": "Укажите ваш username в Telegram (без @):",
     }
 
     field_states = {
@@ -105,13 +112,15 @@ async def edit_profile_callback(callback: types.CallbackQuery, state: FSMContext
         "study_location": ProfileStates.edit_study_location,
         "study_program": ProfileStates.edit_study_program,
         "accommodation": ProfileStates.edit_accommodation,
-        "telegram_username": ProfileStates.edit_telegram_username
+        "telegram_username": ProfileStates.edit_telegram_username,
     }
 
     await state.update_data(edit_field=field)
 
     if field == "gender":
-        await callback.message.answer(field_prompts[field], reply_markup=get_gender_keyboard())
+        await callback.message.answer(
+            field_prompts[field], reply_markup=get_gender_keyboard()
+        )
     elif field == "interests":
         user_data = await state.get_data()
         user_id = user_data.get("user_id")
@@ -120,10 +129,14 @@ async def edit_profile_callback(callback: types.CallbackQuery, state: FSMContext
             user = await session.get(User, user_id)
             current_interests = user.interests or []
 
-        await callback.message.answer(field_prompts[field], reply_markup=get_interests_keyboard(current_interests))
+        await callback.message.answer(
+            field_prompts[field], reply_markup=get_interests_keyboard(current_interests)
+        )
         await state.update_data(selected_interests=current_interests)
     elif field == "accommodation":
-        await callback.message.answer(field_prompts[field], reply_markup=get_accommodation_keyboard())
+        await callback.message.answer(
+            field_prompts[field], reply_markup=get_accommodation_keyboard()
+        )
     else:
         await callback.message.answer(field_prompts[field])
 
@@ -136,7 +149,9 @@ async def process_profile_edit(message: types.Message, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if not user_id:
-        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        await message.answer(
+            "Пожалуйста, используйте /start для начала работы с ботом."
+        )
         return
 
     current_state = await state.get_state()
@@ -156,7 +171,7 @@ async def process_profile_edit(message: types.Message, state: FSMContext):
         "ProfileStates:edit_pets": "pet_preference",
         "ProfileStates:edit_study_location": "study_location",
         "ProfileStates:edit_study_program": "study_program",
-        "ProfileStates:edit_telegram_username": "telegram_username"
+        "ProfileStates:edit_telegram_username": "telegram_username",
     }
 
     api_field = field_mapping.get(current_state)
@@ -179,13 +194,15 @@ async def process_profile_edit(message: types.Message, state: FSMContext):
         value = int(value)
 
     if api_field == "telegram_username":
-        if value.startswith('@'):
+        if value.startswith("@"):
             value = value[1:]
 
     async with postgres_helper.session_factory() as session:
         user = await session.get(User, user_id)
         if not user:
-            await message.answer("Пользователь не найден. Используйте /start для перезапуска бота.")
+            await message.answer(
+                "Пользователь не найден. Используйте /start для перезапуска бота."
+            )
             return
 
         setattr(user, api_field, value)
@@ -198,32 +215,47 @@ async def process_profile_edit(message: types.Message, state: FSMContext):
 
             if is_onboarding:
                 if api_field == "age":
-                    await message.answer("Отлично! Теперь укажите ваш пол:", reply_markup=get_gender_keyboard())
+                    await message.answer(
+                        "Отлично! Теперь укажите ваш пол:",
+                        reply_markup=get_gender_keyboard(),
+                    )
                     await state.set_state(ProfileStates.edit_gender)
                     return
                 elif api_field == "occupation":
-                    await message.answer("Хорошо! Теперь укажите ВУЗ или город, где вы учитесь/планируете учиться:")
+                    await message.answer(
+                        "Хорошо! Теперь укажите ВУЗ или город, где вы учитесь/планируете учиться:"
+                    )
                     await state.set_state(ProfileStates.edit_study_location)
                     return
                 elif api_field == "study_location":
-                    await message.answer("Укажите вашу специальность или направление обучения:")
+                    await message.answer(
+                        "Укажите вашу специальность или направление обучения:"
+                    )
                     await state.set_state(ProfileStates.edit_study_program)
                     return
                 elif api_field == "study_program":
-                    await message.answer("Выберите предпочтительный вариант жилья:",
-                                         reply_markup=get_accommodation_keyboard())
+                    await message.answer(
+                        "Выберите предпочтительный вариант жилья:",
+                        reply_markup=get_accommodation_keyboard(),
+                    )
                     await state.set_state(ProfileStates.edit_accommodation)
                     return
                 elif api_field == "bio":
-                    await message.answer("Отлично! Теперь оцените уровень вашей чистоплотности от 1 до 5:")
+                    await message.answer(
+                        "Отлично! Теперь оцените уровень вашей чистоплотности от 1 до 5:"
+                    )
                     await state.set_state(ProfileStates.edit_cleanliness)
                     return
                 elif api_field == "cleanliness_level":
-                    await message.answer("Хорошо! Опишите ваш режим сна (например, 'жаворонок', 'сова'):")
+                    await message.answer(
+                        "Хорошо! Опишите ваш режим сна (например, 'жаворонок', 'сова'):"
+                    )
                     await state.set_state(ProfileStates.edit_sleep)
                     return
                 elif api_field == "sleep_habits":
-                    await message.answer("Укажите ваш бюджет на аренду (число в рублях):")
+                    await message.answer(
+                        "Укажите ваш бюджет на аренду (число в рублях):"
+                    )
                     await state.set_state(ProfileStates.edit_budget)
                     return
                 elif api_field == "rent_budget":
@@ -245,7 +277,7 @@ async def process_profile_edit(message: types.Message, state: FSMContext):
                 elif api_field == "telegram_username":
                     await message.answer(
                         "✅ Базовый профиль заполнен! Теперь вы можете искать соседей.",
-                        reply_markup=get_main_menu_keyboard()
+                        reply_markup=get_main_menu_keyboard(),
                     )
                     await state.clear()
                     return
@@ -256,7 +288,9 @@ async def process_profile_edit(message: types.Message, state: FSMContext):
 
         except Exception as e:
             logger.error(f"Error updating user profile: {e}")
-            await message.answer("Произошла ошибка при обновлении профиля. Пожалуйста, попробуйте еще раз.")
+            await message.answer(
+                "Произошла ошибка при обновлении профиля. Пожалуйста, попробуйте еще раз."
+            )
             await session.rollback()
 
 
@@ -297,7 +331,7 @@ async def accommodation_callback(callback: types.CallbackQuery, state: FSMContex
     option_map = {
         "apartment": "apartment",
         "dormitory": "dormitory",
-        "no_preference": "no_preference"
+        "no_preference": "no_preference",
     }
 
     accommodation_value = option_map.get(option)
@@ -352,7 +386,7 @@ async def process_interests_edit(callback: types.CallbackQuery, state: FSMContex
         selected_text = ", ".join(interests) if interests else "Нет выбранных интересов"
         await callback.message.edit_text(
             f"Выберите ваши интересы:\n\nВыбрано: {selected_text}",
-            reply_markup=get_interests_keyboard(interests)
+            reply_markup=get_interests_keyboard(interests),
         )
 
     await callback.answer()
@@ -364,9 +398,17 @@ def register_profile_handlers(dp):
     router.message.register(show_profile, Command("profile"))
     router.callback_query.register(edit_profile_callback, F.data.startswith("edit_"))
     router.callback_query.register(gender_callback, F.data.startswith("gender_"))
-    router.callback_query.register(accommodation_callback, F.data.startswith("accommodation_"))
-    router.callback_query.register(process_interests_edit, F.data.startswith("interest_"))
+    router.callback_query.register(
+        accommodation_callback, F.data.startswith("accommodation_")
+    )
+    router.callback_query.register(
+        process_interests_edit, F.data.startswith("interest_")
+    )
 
     for state in ProfileStates:
-        if state not in [ProfileStates.edit_interests, ProfileStates.edit_gender, ProfileStates.edit_accommodation]:
+        if state not in [
+            ProfileStates.edit_interests,
+            ProfileStates.edit_gender,
+            ProfileStates.edit_accommodation,
+        ]:
             router.message.register(process_profile_edit, state)

@@ -21,17 +21,16 @@ async def start_search(message: types.Message, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if not user_id:
-        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        await message.answer(
+            "Пожалуйста, используйте /start для начала работы с ботом."
+        )
         return
 
     async with postgres_helper.session_factory() as session:
         current_user = await session.get(User, user_id)
 
         query = select(Match).where(
-            or_(
-                Match.user1_id == user_id,
-                Match.user2_id == user_id
-            )
+            or_(Match.user1_id == user_id, Match.user2_id == user_id)
         )
         result = await session.execute(query)
         matches = result.scalars().all()
@@ -43,9 +42,7 @@ async def start_search(message: types.Message, state: FSMContext):
             else:
                 matched_ids.append(match.user1_id)
 
-        query = select(Like).where(
-            Like.liker_id == user_id
-        )
+        query = select(Like).where(Like.liker_id == user_id)
         result = await session.execute(query)
         likes_sent = result.scalars().all()
 
@@ -53,36 +50,35 @@ async def start_search(message: types.Message, state: FSMContext):
 
         exclude_ids = matched_ids + liked_ids + [user_id]
         query = select(User).where(
-            and_(
-                not_(User.id.in_(exclude_ids)),
-                User.is_active == True
-            )
+            and_(not_(User.id.in_(exclude_ids)), User.is_active == True)
         )
         result = await session.execute(query)
         roommates = result.scalars().all()
 
         roommates_data = []
         for roommate in roommates:
-            roommates_data.append({
-                "id": roommate.id,
-                "name": roommate.name,
-                "age": roommate.age,
-                "gender": roommate.gender,
-                "occupation": roommate.occupation,
-                "bio": roommate.bio,
-                "interests": roommate.interests or [],
-                "cleanliness_level": roommate.cleanliness_level,
-                "sleep_habits": roommate.sleep_habits,
-                "rent_budget": roommate.rent_budget,
-                "location": roommate.location,
-                "smoking_preference": roommate.smoking_preference,
-                "pet_preference": roommate.pet_preference
-            })
+            roommates_data.append(
+                {
+                    "id": roommate.id,
+                    "name": roommate.name,
+                    "age": roommate.age,
+                    "gender": roommate.gender,
+                    "occupation": roommate.occupation,
+                    "bio": roommate.bio,
+                    "interests": roommate.interests or [],
+                    "cleanliness_level": roommate.cleanliness_level,
+                    "sleep_habits": roommate.sleep_habits,
+                    "rent_budget": roommate.rent_budget,
+                    "location": roommate.location,
+                    "smoking_preference": roommate.smoking_preference,
+                    "pet_preference": roommate.pet_preference,
+                }
+            )
 
     if not roommates_data:
         await message.answer(
             "🔍 На данный момент нет подходящих соседей. Попробуйте позже.",
-            reply_markup=get_main_menu_keyboard()
+            reply_markup=get_main_menu_keyboard(),
         )
         return
 
@@ -98,27 +94,27 @@ async def show_roommate(message: types.Message, state: FSMContext):
     if not roommates or current_index >= len(roommates):
         await message.answer(
             "🔍 Вы просмотрели всех потенциальных соседей. Попробуйте позже.",
-            reply_markup=get_main_menu_keyboard()
+            reply_markup=get_main_menu_keyboard(),
         )
         return
 
     roommate = roommates[current_index]
 
-    interests = roommate.get('interests', [])
+    interests = roommate.get("interests", [])
     if not interests or not isinstance(interests, (list, tuple)):
-        interests = ['Не указано']
+        interests = ["Не указано"]
 
-    name = roommate.get('name') or 'Не указано'
-    age = roommate.get('age') or 'Не указано'
-    gender = roommate.get('gender') or 'Не указано'
-    occupation = roommate.get('occupation') or 'Не указано'
-    cleanliness = roommate.get('cleanliness_level') or 'Не указано'
-    sleep_habits = roommate.get('sleep_habits') or 'Не указано'
-    rent_budget = roommate.get('rent_budget') or 'Не указано'
-    location = roommate.get('location') or 'Не указано'
-    smoking = roommate.get('smoking_preference') or 'Не указано'
-    pets = roommate.get('pet_preference') or 'Не указано'
-    bio = roommate.get('bio') or 'Не указано'
+    name = roommate.get("name") or "Не указано"
+    age = roommate.get("age") or "Не указано"
+    gender = roommate.get("gender") or "Не указано"
+    occupation = roommate.get("occupation") or "Не указано"
+    cleanliness = roommate.get("cleanliness_level") or "Не указано"
+    sleep_habits = roommate.get("sleep_habits") or "Не указано"
+    rent_budget = roommate.get("rent_budget") or "Не указано"
+    location = roommate.get("location") or "Не указано"
+    smoking = roommate.get("smoking_preference") or "Не указано"
+    pets = roommate.get("pet_preference") or "Не указано"
+    bio = roommate.get("bio") or "Не указано"
 
     profile_text = (
         f"👤 *Потенциальный сосед*\n\n"
@@ -136,7 +132,9 @@ async def show_roommate(message: types.Message, state: FSMContext):
         f"*Интересы:*\n{', '.join(interests)}"
     )
 
-    await message.answer(profile_text, reply_markup=get_roommate_keyboard(roommate.get('id')))
+    await message.answer(
+        profile_text, reply_markup=get_roommate_keyboard(roommate.get("id"))
+    )
 
 
 async def check_compatibility(callback: types.CallbackQuery, state: FSMContext):
@@ -153,7 +151,9 @@ async def check_compatibility(callback: types.CallbackQuery, state: FSMContext):
             await callback.answer()
             return
 
-        score, explanation = ai_matching_service.calculate_compatibility_score(current_user, roommate)
+        score, explanation = ai_matching_service.calculate_compatibility_score(
+            current_user, roommate
+        )
 
         compatibility_text = (
             f"📊 *Результат анализа совместимости*\n\n"
@@ -161,7 +161,9 @@ async def check_compatibility(callback: types.CallbackQuery, state: FSMContext):
             f"*Анализ:*\n{explanation}"
         )
 
-        await callback.message.answer(compatibility_text, reply_markup=get_compatibility_keyboard(roommate_id))
+        await callback.message.answer(
+            compatibility_text, reply_markup=get_compatibility_keyboard(roommate_id)
+        )
 
     await callback.answer()
 
@@ -175,9 +177,7 @@ async def roommate_action(callback: types.CallbackQuery, state: FSMContext):
     if action == "like":
         async with postgres_helper.session_factory() as session:
             like, is_match, notification = await create_like(
-                session=session,
-                liker_id=user_id,
-                liked_id=roommate_id
+                session=session, liker_id=user_id, liked_id=roommate_id
             )
 
             if is_match:
@@ -210,27 +210,27 @@ async def back_to_profile_callback(callback: types.CallbackQuery, state: FSMCont
     if not roommates or current_index >= len(roommates):
         await callback.message.answer(
             "Не удалось отобразить профиль. Попробуйте /search.",
-            reply_markup=get_main_menu_keyboard()
+            reply_markup=get_main_menu_keyboard(),
         )
         return
 
     roommate = roommates[current_index]
 
-    interests = roommate.get('interests', [])
+    interests = roommate.get("interests", [])
     if not interests or not isinstance(interests, (list, tuple)):
-        interests = ['Не указано']
+        interests = ["Не указано"]
 
-    name = roommate.get('name') or 'Не указано'
-    age = roommate.get('age') or 'Не указано'
-    gender = roommate.get('gender') or 'Не указано'
-    occupation = roommate.get('occupation') or 'Не указано'
-    cleanliness = roommate.get('cleanliness_level') or 'Не указано'
-    sleep_habits = roommate.get('sleep_habits') or 'Не указано'
-    rent_budget = roommate.get('rent_budget') or 'Не указано'
-    location = roommate.get('location') or 'Не указано'
-    smoking = roommate.get('smoking_preference') or 'Не указано'
-    pets = roommate.get('pet_preference') or 'Не указано'
-    bio = roommate.get('bio') or 'Не указано'
+    name = roommate.get("name") or "Не указано"
+    age = roommate.get("age") or "Не указано"
+    gender = roommate.get("gender") or "Не указано"
+    occupation = roommate.get("occupation") or "Не указано"
+    cleanliness = roommate.get("cleanliness_level") or "Не указано"
+    sleep_habits = roommate.get("sleep_habits") or "Не указано"
+    rent_budget = roommate.get("rent_budget") or "Не указано"
+    location = roommate.get("location") or "Не указано"
+    smoking = roommate.get("smoking_preference") or "Не указано"
+    pets = roommate.get("pet_preference") or "Не указано"
+    bio = roommate.get("bio") or "Не указано"
 
     profile_text = (
         f"👤 *Потенциальный сосед*\n\n"
@@ -248,7 +248,9 @@ async def back_to_profile_callback(callback: types.CallbackQuery, state: FSMCont
         f"*Интересы:*\n{', '.join(interests)}"
     )
 
-    await callback.message.answer(profile_text, reply_markup=get_roommate_keyboard(roommate.get('id')))
+    await callback.message.answer(
+        profile_text, reply_markup=get_roommate_keyboard(roommate.get("id"))
+    )
 
 
 def register_search_handlers(dp):
@@ -256,5 +258,9 @@ def register_search_handlers(dp):
 
     router.message.register(start_search, Command("search"))
     router.callback_query.register(roommate_action, F.data.startswith("roommate_"))
-    router.callback_query.register(check_compatibility, F.data.startswith("compatibility_"))
-    router.callback_query.register(back_to_profile_callback, F.data.startswith("back_to_profile_"))
+    router.callback_query.register(
+        check_compatibility, F.data.startswith("compatibility_")
+    )
+    router.callback_query.register(
+        back_to_profile_callback, F.data.startswith("back_to_profile_")
+    )

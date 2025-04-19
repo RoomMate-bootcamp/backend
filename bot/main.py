@@ -21,7 +21,9 @@ async def periodic_notification_check(bot: Bot):
             logging.info("Running periodic notification check")
 
             async with postgres_helper.session_factory() as session:
-                query = text("SELECT id FROM users WHERE user_metadata->>'telegram_id' IS NOT NULL")
+                query = text(
+                    "SELECT id FROM users WHERE user_metadata->>'telegram_id' IS NOT NULL"
+                )
                 result = await session.execute(query)
                 users = result.fetchall()
 

@@ -14,15 +14,14 @@ async def show_matches(message: types.Message, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if not user_id:
-        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        await message.answer(
+            "Пожалуйста, используйте /start для начала работы с ботом."
+        )
         return
 
     async with postgres_helper.session_factory() as session:
         query = select(Match).where(
-            or_(
-                Match.user1_id == user_id,
-                Match.user2_id == user_id
-            )
+            or_(Match.user1_id == user_id, Match.user2_id == user_id)
         )
         result = await session.execute(query)
         matches = result.scalars().all()
@@ -33,21 +32,27 @@ async def show_matches(message: types.Message, state: FSMContext):
             other_user = await session.get(User, other_id)
 
             if other_user:
-                matches_data.append({
-                    "id": match.id,
-                    "timestamp": match.timestamp,
-                    "roommate": {
-                        "id": other_user.id,
-                        "name": other_user.name,
-                        "username": other_user.username
+                matches_data.append(
+                    {
+                        "id": match.id,
+                        "timestamp": match.timestamp,
+                        "roommate": {
+                            "id": other_user.id,
+                            "name": other_user.name,
+                            "username": other_user.username,
+                        },
                     }
-                })
+                )
 
     if not matches_data:
-        await message.answer("У вас пока нет совпадений. Используйте /search, чтобы найти потенциальных соседей.")
+        await message.answer(
+            "У вас пока нет совпадений. Используйте /search, чтобы найти потенциальных соседей."
+        )
         return
 
-    await message.answer("🔄 Ваши совпадения:", reply_markup=get_matches_keyboard(matches_data))
+    await message.answer(
+        "🔄 Ваши совпадения:", reply_markup=get_matches_keyboard(matches_data)
+    )
 
 
 async def show_match_details(callback: types.CallbackQuery, state: FSMContext):
@@ -85,7 +90,9 @@ async def show_match_details(callback: types.CallbackQuery, state: FSMContext):
             f"*Интересы:*\n{', '.join(roommate.interests or ['Не указано'])}"
         )
 
-        await callback.message.answer(profile_text, reply_markup=get_match_actions_keyboard(match_id))
+        await callback.message.answer(
+            profile_text, reply_markup=get_match_actions_keyboard(match_id)
+        )
 
     await callback.answer()
 
@@ -104,7 +111,9 @@ async def delete_match(callback: types.CallbackQuery, state: FSMContext):
             return
 
         if match.user1_id != user_id and match.user2_id != user_id:
-            await callback.message.answer("У вас нет прав для удаления этого совпадения.")
+            await callback.message.answer(
+                "У вас нет прав для удаления этого совпадения."
+            )
             await callback.answer()
             return
 
@@ -123,7 +132,9 @@ def register_matches_handlers(dp):
     router.message.register(show_matches, Command("matches"))
     router.callback_query.register(show_match_details, F.data.startswith("match_"))
     router.callback_query.register(delete_match, F.data.startswith("delete_match_"))
-    router.callback_query.register(back_to_matches_callback, F.data == "back_to_matches")
+    router.callback_query.register(
+        back_to_matches_callback, F.data == "back_to_matches"
+    )
 
 
 async def back_to_matches_callback(callback: types.CallbackQuery, state: FSMContext):

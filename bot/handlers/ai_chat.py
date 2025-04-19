@@ -14,11 +14,8 @@ from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
 
 router = Router()
 
-sdk = YCloudML(
-    folder_id=YANDEX_FOLDER_ID,
-    auth=YANDEX_API_KEY
-)
-model = sdk.models.completions('yandexgpt-lite')
+sdk = YCloudML(folder_id=YANDEX_FOLDER_ID, auth=YANDEX_API_KEY)
+model = sdk.models.completions("yandexgpt-lite")
 model.configure(
     temperature=0.5,
     max_tokens=2000,
@@ -30,14 +27,16 @@ async def start_ai_chat(message: types.Message, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if not user_id:
-        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        await message.answer(
+            "Пожалуйста, используйте /start для начала работы с ботом."
+        )
         return
 
     await message.answer(
         "🤖 Привет! Я ИИ-помощник по бытовым вопросам. "
         "Могу помочь с организацией пространства, уборкой, готовкой, "
         "решением бытовых конфликтов и многим другим. Просто спросите меня о чем угодно!",
-        reply_markup=get_ai_chat_keyboard()
+        reply_markup=get_ai_chat_keyboard(),
     )
 
     await state.set_state(AIChatState.chatting)
@@ -47,7 +46,7 @@ async def exit_ai_chat(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.answer(
         "Вы вышли из режима общения с ИИ-помощником. Что бы вы хотели сделать дальше?",
-        reply_markup=get_main_menu_keyboard()
+        reply_markup=get_main_menu_keyboard(),
     )
     await callback.answer()
 
@@ -61,7 +60,9 @@ async def process_ai_query(message: types.Message, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if not user_id:
-        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        await message.answer(
+            "Пожалуйста, используйте /start для начала работы с ботом."
+        )
         return
 
     async with postgres_helper.session_factory() as session:
@@ -78,7 +79,7 @@ async def process_ai_query(message: types.Message, state: FSMContext):
             "sleep_habits": user.sleep_habits,
             "smoking_preference": user.smoking_preference,
             "pet_preference": user.pet_preference,
-            "interests": user.interests or []
+            "interests": user.interests or [],
         }
 
     query = message.text
@@ -108,7 +109,7 @@ async def process_ai_query(message: types.Message, state: FSMContext):
         await waiting_msg.edit_text(
             f"😕 Произошла ошибка при получении ответа: {str(e)}\n"
             "Пожалуйста, попробуйте еще раз или задайте другой вопрос.",
-            reply_markup=get_ai_chat_keyboard()
+            reply_markup=get_ai_chat_keyboard(),
         )
 
 
@@ -139,8 +140,8 @@ async def get_ai_response(query: str, user_profile):
     user_prompt = f"{user_context}\n\nВопрос: {query}"
 
     messages = [
-        {'role': 'system', 'text': system_prompt},
-        {'role': 'user', 'text': user_prompt},
+        {"role": "system", "text": system_prompt},
+        {"role": "user", "text": user_prompt},
     ]
 
     try:

@@ -17,10 +17,13 @@ async def check_notifications(user_id: int, bot):
     """Check and send pending notifications for a user"""
     try:
         async with postgres_helper.session_factory() as session:
-            query = select(Notification).where(
-                (Notification.user_id == user_id) &
-                (Notification.is_read == False)
-            ).order_by(Notification.timestamp.desc())
+            query = (
+                select(Notification)
+                .where(
+                    (Notification.user_id == user_id) & (Notification.is_read == False)
+                )
+                .order_by(Notification.timestamp.desc())
+            )
 
             result = await session.execute(query)
             notifications = result.scalars().all()
@@ -28,12 +31,16 @@ async def check_notifications(user_id: int, bot):
             if not notifications:
                 return
 
-            query = text("SELECT user_metadata->>'telegram_id' AS telegram_id FROM users WHERE id = :user_id")
+            query = text(
+                "SELECT user_metadata->>'telegram_id' AS telegram_id FROM users WHERE id = :user_id"
+            )
             result = await session.execute(query, {"user_id": user_id})
             row = result.fetchone()
 
             if not row or not row[0]:
-                logger.warning(f"Cannot send notification: User {user_id} has no Telegram ID")
+                logger.warning(
+                    f"Cannot send notification: User {user_id} has no Telegram ID"
+                )
                 return
 
             telegram_id = row[0]
@@ -55,12 +62,17 @@ async def check_notifications(user_id: int, bot):
                     message = (
                         f"❤️ *У вас новый лайк!*\n\n"
                         f"{liker_info} проявил(а) интерес к вам!\n\n"
-                        f"Посмотрите вкладку \"Мои совпадения\", чтобы узнать больше."
+                        f'Посмотрите вкладку "Мои совпадения", чтобы узнать больше.'
                     )
 
                     keyboard = types.InlineKeyboardMarkup(
                         inline_keyboard=[
-                            [types.InlineKeyboardButton(text="👀 Посмотреть совпадения", callback_data="show_matches")]
+                            [
+                                types.InlineKeyboardButton(
+                                    text="👀 Посмотреть совпадения",
+                                    callback_data="show_matches",
+                                )
+                            ]
                         ]
                     )
 
@@ -70,8 +82,12 @@ async def check_notifications(user_id: int, bot):
                         if partner:
                             partner_name = partner.name or "Пользователь"
                             partner_age = f", {partner.age}" if partner.age else ""
-                            partner_gender = f", {partner.gender}" if partner.gender else ""
-                            partner_info = f"{partner_name}{partner_age}{partner_gender}"
+                            partner_gender = (
+                                f", {partner.gender}" if partner.gender else ""
+                            )
+                            partner_info = (
+                                f"{partner_name}{partner_age}{partner_gender}"
+                            )
                         else:
                             partner_info = "Кто-то"
                     else:
@@ -85,7 +101,12 @@ async def check_notifications(user_id: int, bot):
 
                     keyboard = types.InlineKeyboardMarkup(
                         inline_keyboard=[
-                            [types.InlineKeyboardButton(text="💬 Посмотреть совпадения", callback_data="show_matches")]
+                            [
+                                types.InlineKeyboardButton(
+                                    text="💬 Посмотреть совпадения",
+                                    callback_data="show_matches",
+                                )
+                            ]
                         ]
                     )
 
@@ -98,7 +119,7 @@ async def check_notifications(user_id: int, bot):
                         chat_id=telegram_id,
                         text=message,
                         reply_markup=keyboard,
-                        parse_mode="Markdown"
+                        parse_mode="Markdown",
                     )
 
                     notification.is_read = True
@@ -107,7 +128,9 @@ async def check_notifications(user_id: int, bot):
 
             if notifications:
                 await session.commit()
-                logger.info(f"Sent {len(notifications)} notifications to user {user_id}")
+                logger.info(
+                    f"Sent {len(notifications)} notifications to user {user_id}"
+                )
 
     except Exception as e:
         logger.error(f"Error in check_notifications: {e}")
@@ -118,21 +141,25 @@ async def show_notification_list(message: types.Message, state: FSMContext):
     user_id = user_data.get("user_id")
 
     if not user_id:
-        await message.answer("Пожалуйста, используйте /start для начала работы с ботом.")
+        await message.answer(
+            "Пожалуйста, используйте /start для начала работы с ботом."
+        )
         return
 
     async with postgres_helper.session_factory() as session:
-        query = select(Notification).where(
-            Notification.user_id == user_id
-        ).order_by(Notification.timestamp.desc()).limit(10)
+        query = (
+            select(Notification)
+            .where(Notification.user_id == user_id)
+            .order_by(Notification.timestamp.desc())
+            .limit(10)
+        )
 
         result = await session.execute(query)
         notifications = result.scalars().all()
 
         if not notifications:
             await message.answer(
-                "У вас нет уведомлений.",
-                reply_markup=get_main_menu_keyboard()
+                "У вас нет уведомлений.", reply_markup=get_main_menu_keyboard()
             )
             return
 
@@ -150,12 +177,14 @@ async def show_notification_list(message: types.Message, state: FSMContext):
 
             status = "👁️ Просмотрено" if notification.is_read else "🆕 Новое"
 
-            notification_text += f"{i}. {type_text} - {timestamp} ({status})\n{notification.content}\n\n"
+            notification_text += (
+                f"{i}. {type_text} - {timestamp} ({status})\n{notification.content}\n\n"
+            )
 
         await message.answer(
             notification_text,
             reply_markup=get_main_menu_keyboard(),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
 
 

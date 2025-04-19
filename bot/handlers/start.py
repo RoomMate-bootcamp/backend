@@ -28,7 +28,9 @@ async def start_command(message: types.Message, state: FSMContext):
         user = result.scalar_one_or_none()
 
         if not user:
-            query = text("SELECT * FROM users WHERE user_metadata->>'telegram_id' = :tg_id")
+            query = text(
+                "SELECT * FROM users WHERE user_metadata->>'telegram_id' = :tg_id"
+            )
             result = await session.execute(query, {"tg_id": tg_id})
             user_row = result.fetchone()
 
@@ -50,7 +52,7 @@ async def start_command(message: types.Message, state: FSMContext):
                     hashed_password=hashed_password,
                     name=message.from_user.first_name,
                     is_active=True,
-                    user_metadata={"telegram_id": tg_id}
+                    user_metadata={"telegram_id": tg_id},
                 )
 
                 session.add(new_user)
@@ -67,7 +69,7 @@ async def start_command(message: types.Message, state: FSMContext):
                 query = select(User).where(
                     or_(
                         User.username == username,
-                        User.email == f"{username}@telegram.user"
+                        User.email == f"{username}@telegram.user",
                     )
                 )
                 result = await session.execute(query)
@@ -75,6 +77,7 @@ async def start_command(message: types.Message, state: FSMContext):
 
                 if not user:
                     import time
+
                     timestamp = int(time.time())
                     username = f"tg_{message.from_user.id}_{timestamp}"
                     email = f"{username}@telegram.user"
@@ -87,7 +90,7 @@ async def start_command(message: types.Message, state: FSMContext):
                         hashed_password=hashed_password,
                         name=message.from_user.first_name,
                         is_active=True,
-                        user_metadata={"telegram_id": tg_id}
+                        user_metadata={"telegram_id": tg_id},
                     )
 
                     session.add(new_user)
@@ -95,19 +98,23 @@ async def start_command(message: types.Message, state: FSMContext):
                     await session.refresh(new_user)
                     user = new_user
                     user_is_new = True
-                    logger.info(f"Created new user with timestamp {username} after handling IntegrityError")
+                    logger.info(
+                        f"Created new user with timestamp {username} after handling IntegrityError"
+                    )
 
         await state.update_data(user_id=user.id, is_onboarding=user_is_new)
 
         is_profile_incomplete = (
-                user.age is None or
-                user.gender is None or
-                user.occupation is None or
-                user.cleanliness_level is None or
-                user.rent_budget is None
+            user.age is None
+            or user.gender is None
+            or user.occupation is None
+            or user.cleanliness_level is None
+            or user.rent_budget is None
         )
 
-        logger.info(f"User {user.id}: is_new={user_is_new}, profile_incomplete={is_profile_incomplete}")
+        logger.info(
+            f"User {user.id}: is_new={user_is_new}, profile_incomplete={is_profile_incomplete}"
+        )
 
         if user_is_new or is_profile_incomplete:
             await message.answer(
@@ -118,38 +125,37 @@ async def start_command(message: types.Message, state: FSMContext):
             if user.age is None:
                 await message.answer(
                     "Для начала, укажите ваш возраст (число):",
-                    reply_markup=types.ReplyKeyboardRemove()
+                    reply_markup=types.ReplyKeyboardRemove(),
                 )
                 await state.set_state(ProfileStates.edit_age)
             elif user.gender is None:
                 from bot.keyboards.profile_kb import get_gender_keyboard
+
                 await message.answer(
-                    "Укажите ваш пол:",
-                    reply_markup=get_gender_keyboard()
+                    "Укажите ваш пол:", reply_markup=get_gender_keyboard()
                 )
                 await state.set_state(ProfileStates.edit_gender)
             elif user.occupation is None:
                 await message.answer(
-                    "Укажите вашу профессию:",
-                    reply_markup=types.ReplyKeyboardRemove()
+                    "Укажите вашу профессию:", reply_markup=types.ReplyKeyboardRemove()
                 )
                 await state.set_state(ProfileStates.edit_occupation)
             elif user.cleanliness_level is None:
                 await message.answer(
                     "Оцените уровень вашей чистоплотности от 1 до 5:",
-                    reply_markup=types.ReplyKeyboardRemove()
+                    reply_markup=types.ReplyKeyboardRemove(),
                 )
                 await state.set_state(ProfileStates.edit_cleanliness)
             elif user.rent_budget is None:
                 await message.answer(
                     "Укажите ваш бюджет на аренду (число в рублях):",
-                    reply_markup=types.ReplyKeyboardRemove()
+                    reply_markup=types.ReplyKeyboardRemove(),
                 )
                 await state.set_state(ProfileStates.edit_budget)
             else:
                 await message.answer(
                     "Продолжим заполнение профиля. Расскажите о себе:",
-                    reply_markup=types.ReplyKeyboardRemove()
+                    reply_markup=types.ReplyKeyboardRemove(),
                 )
                 await state.set_state(ProfileStates.edit_bio)
 
@@ -159,9 +165,9 @@ async def start_command(message: types.Message, state: FSMContext):
             )
 
             from bot.keyboards.main_kb import get_main_menu_keyboard
+
             await message.answer(
-                "Что вы хотите сделать?",
-                reply_markup=get_main_menu_keyboard()
+                "Что вы хотите сделать?", reply_markup=get_main_menu_keyboard()
             )
     await check_notifications(user.id, message.bot)
 

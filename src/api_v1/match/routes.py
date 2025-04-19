@@ -6,18 +6,24 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api_v1.auth.crud import get_current_active_user
-from src.api_v1.match.schemas import MatchResponse, MatchWithUserResponse, MatchesResponse
+from src.api_v1.match.schemas import (
+    MatchResponse,
+    MatchWithUserResponse,
+    MatchesResponse,
+)
 from src.core.database import User, postgres_helper
 from src.core.database.alchemy_models.match import Match
 
 matches_router = APIRouter(prefix="/matches", tags=["Matches"])
 
 
-@matches_router.post("/{roommate_id}", response_model=MatchResponse, status_code=status.HTTP_201_CREATED)
+@matches_router.post(
+    "/{roommate_id}", response_model=MatchResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_match(
-        roommate_id: int,
-        current_user: Annotated[User, Depends(get_current_active_user)],
-        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+    roommate_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
     query = select(User).where(User.id == roommate_id)
     result = await session.execute(query)
@@ -31,8 +37,8 @@ async def create_match(
 
     query = select(Match).where(
         (
-                (Match.user1_id == current_user.id) & (Match.user2_id == roommate_id) |
-                (Match.user1_id == roommate_id) & (Match.user2_id == current_user.id)
+            (Match.user1_id == current_user.id) & (Match.user2_id == roommate_id)
+            | (Match.user1_id == roommate_id) & (Match.user2_id == current_user.id)
         )
     )
     result = await session.execute(query)
@@ -56,8 +62,8 @@ async def create_match(
 
 @matches_router.get("/", response_model=List[MatchWithUserResponse])
 async def get_matches(
-        current_user: Annotated[User, Depends(get_current_active_user)],
-        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
     query = select(Match).where(
         (Match.user1_id == current_user.id) | (Match.user2_id == current_user.id)
@@ -67,7 +73,9 @@ async def get_matches(
 
     match_responses = []
     for match in matches:
-        roommate_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
+        roommate_id = (
+            match.user2_id if match.user1_id == current_user.id else match.user1_id
+        )
 
         query = select(User).where(User.id == roommate_id)
         result = await session.execute(query)
@@ -75,9 +83,7 @@ async def get_matches(
 
         if roommate:
             match_response = MatchWithUserResponse(
-                id=match.id,
-                timestamp=match.timestamp,
-                roommate=roommate
+                id=match.id, timestamp=match.timestamp, roommate=roommate
             )
             match_responses.append(match_response)
 
@@ -86,13 +92,13 @@ async def get_matches(
 
 @matches_router.delete("/{match_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_match(
-        match_id: int,
-        current_user: Annotated[User, Depends(get_current_active_user)],
-        session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
+    match_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(postgres_helper.session_dependency)],
 ):
     query = select(Match).where(
-        (Match.id == match_id) &
-        ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
+        (Match.id == match_id)
+        & ((Match.user1_id == current_user.id) | (Match.user2_id == current_user.id))
     )
     result = await session.execute(query)
     match = result.scalar_one_or_none()

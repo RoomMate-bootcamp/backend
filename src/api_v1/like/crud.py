@@ -10,23 +10,20 @@ from src.core.database.alchemy_models.user import User
 
 
 async def create_like(
-        session: AsyncSession, liker_id: int, liked_id: int
+    session: AsyncSession, liker_id: int, liked_id: int
 ) -> Tuple[Like, bool, Optional[Notification]]:
     query = select(Like).where(
         and_(
             Like.liker_id == liked_id,
             Like.liked_id == liker_id,
-            Like.status != LikeStatus.DECLINED
+            Like.status != LikeStatus.DECLINED,
         )
     )
     result = await session.execute(query)
     reverse_like = result.scalar_one_or_none()
 
     query = select(Like).where(
-        and_(
-            Like.liker_id == liker_id,
-            Like.liked_id == liked_id
-        )
+        and_(Like.liker_id == liker_id, Like.liked_id == liked_id)
     )
     result = await session.execute(query)
     existing_like = result.scalar_one_or_none()
@@ -38,10 +35,10 @@ async def create_like(
         liker_id=liker_id,
         liked_id=liked_id,
         status=LikeStatus.PENDING,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
     )
     session.add(new_like)
-    await session.flush() 
+    await session.flush()
 
     notification = None
     is_match = False
@@ -58,7 +55,7 @@ async def create_like(
             content=f"У вас с {liker.name} схожие интересы! Теперь вы можете общаться.",
             related_user_id=liker_id,
             related_entity_id=new_like.id,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
         session.add(notification)
     else:
@@ -69,7 +66,7 @@ async def create_like(
             content=f"{liker.name} проявил(а) интерес к вам!",
             related_user_id=liker_id,
             related_entity_id=new_like.id,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
         session.add(notification)
 
@@ -78,7 +75,7 @@ async def create_like(
 
 
 async def respond_to_like(
-        session: AsyncSession, like_id: int, user_id: int, accept: bool
+    session: AsyncSession, like_id: int, user_id: int, accept: bool
 ) -> Tuple[Like, Optional[Like], Optional[Notification]]:
     like = await session.get(Like, like_id)
     if not like or like.liked_id != user_id:
@@ -88,10 +85,7 @@ async def respond_to_like(
         like.status = LikeStatus.ACCEPTED
 
         query = select(Like).where(
-            and_(
-                Like.liker_id == user_id,
-                Like.liked_id == like.liker_id
-            )
+            and_(Like.liker_id == user_id, Like.liked_id == like.liker_id)
         )
         result = await session.execute(query)
         reverse_like = result.scalar_one_or_none()
@@ -106,7 +100,7 @@ async def respond_to_like(
                 content=f"У вас с {liker.name} схожие интересы! Теперь вы можете общаться.",
                 related_user_id=user_id,
                 related_entity_id=like.id,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
             session.add(notification)
             await session.commit()
@@ -116,7 +110,7 @@ async def respond_to_like(
                 liker_id=user_id,
                 liked_id=like.liker_id,
                 status=LikeStatus.ACCEPTED,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
             session.add(reverse_like)
 
@@ -127,7 +121,7 @@ async def respond_to_like(
                 content=f"У вас с {liker.name} схожие интересы! Теперь вы можете общаться.",
                 related_user_id=user_id,
                 related_entity_id=like.id,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
             session.add(notification)
             await session.commit()
@@ -139,59 +133,60 @@ async def respond_to_like(
 
 
 async def get_received_likes(
-        session: AsyncSession, user_id: int, status: Optional[LikeStatus] = None
+    session: AsyncSession, user_id: int, status: Optional[LikeStatus] = None
 ) -> List[Like]:
     if status:
-        query = select(Like).where(
-            and_(
-                Like.liked_id == user_id,
-                Like.status == status
-            )
-        ).order_by(Like.timestamp.desc())
+        query = (
+            select(Like)
+            .where(and_(Like.liked_id == user_id, Like.status == status))
+            .order_by(Like.timestamp.desc())
+        )
     else:
-        query = select(Like).where(
-            Like.liked_id == user_id
-        ).order_by(Like.timestamp.desc())
+        query = (
+            select(Like).where(Like.liked_id == user_id).order_by(Like.timestamp.desc())
+        )
 
     result = await session.execute(query)
     return result.scalars().all()
 
 
 async def get_sent_likes(
-        session: AsyncSession, user_id: int, status: Optional[LikeStatus] = None
+    session: AsyncSession, user_id: int, status: Optional[LikeStatus] = None
 ) -> List[Like]:
     if status:
-        query = select(Like).where(
-            and_(
-                Like.liker_id == user_id,
-                Like.status == status
-            )
-        ).order_by(Like.timestamp.desc())
+        query = (
+            select(Like)
+            .where(and_(Like.liker_id == user_id, Like.status == status))
+            .order_by(Like.timestamp.desc())
+        )
     else:
-        query = select(Like).where(
-            Like.liker_id == user_id
-        ).order_by(Like.timestamp.desc())
+        query = (
+            select(Like).where(Like.liker_id == user_id).order_by(Like.timestamp.desc())
+        )
 
     result = await session.execute(query)
     return result.scalars().all()
 
 
 async def get_matches(session: AsyncSession, user_id: int) -> List[Like]:
-    query = select(Like).where(
-        and_(
-            Like.liker_id == user_id,
-            Like.status == LikeStatus.ACCEPTED
-        )
-    ).order_by(Like.timestamp.desc())
+    query = (
+        select(Like)
+        .where(and_(Like.liker_id == user_id, Like.status == LikeStatus.ACCEPTED))
+        .order_by(Like.timestamp.desc())
+    )
 
     result = await session.execute(query)
     return result.scalars().all()
 
 
-async def get_notifications(session: AsyncSession, user_id: int) -> Tuple[List[Notification], int]:
-    query = select(Notification).where(
-        Notification.user_id == user_id
-    ).order_by(Notification.timestamp.desc())
+async def get_notifications(
+    session: AsyncSession, user_id: int
+) -> Tuple[List[Notification], int]:
+    query = (
+        select(Notification)
+        .where(Notification.user_id == user_id)
+        .order_by(Notification.timestamp.desc())
+    )
 
     result = await session.execute(query)
     notifications = result.scalars().all()
@@ -201,7 +196,9 @@ async def get_notifications(session: AsyncSession, user_id: int) -> Tuple[List[N
     return notifications, unread_count
 
 
-async def mark_as_read(session: AsyncSession, notification_id: int, user_id: int) -> bool:
+async def mark_as_read(
+    session: AsyncSession, notification_id: int, user_id: int
+) -> bool:
     notification = await session.get(Notification, notification_id)
     if not notification or notification.user_id != user_id:
         return False
@@ -212,12 +209,11 @@ async def mark_as_read(session: AsyncSession, notification_id: int, user_id: int
 
 
 async def mark_all_as_read(session: AsyncSession, user_id: int) -> int:
-    query = update(Notification).where(
-        and_(
-            Notification.user_id == user_id,
-            Notification.is_read == False
-        )
-    ).values(is_read=True)
+    query = (
+        update(Notification)
+        .where(and_(Notification.user_id == user_id, Notification.is_read == False))
+        .values(is_read=True)
+    )
 
     result = await session.execute(query)
     await session.commit()

@@ -5,18 +5,17 @@ from yandex_cloud_ml_sdk import YCloudML
 
 from bot.config import YANDEX_FOLDER_ID, YANDEX_API_KEY
 
-sdk = YCloudML(
-    folder_id=YANDEX_FOLDER_ID,
-    auth=YANDEX_API_KEY
-)
-model = sdk.models.completions('yandexgpt-lite')
+sdk = YCloudML(folder_id=YANDEX_FOLDER_ID, auth=YANDEX_API_KEY)
+model = sdk.models.completions("yandexgpt-lite")
 model.configure(
     temperature=0.5,
     max_tokens=2000,
 )
 
 
-async def get_ai_response(query: str, user_profile: Optional[Dict[str, Any]] = None) -> str:
+async def get_ai_response(
+    query: str, user_profile: Optional[Dict[str, Any]] = None
+) -> str:
     system_prompt = """
     Ты - полезный ассистент по бытовым вопросам для соседей по квартире.
     Ты помогаешь с решением бытовых проблем, организацией пространства, уборкой, 
@@ -43,8 +42,8 @@ async def get_ai_response(query: str, user_profile: Optional[Dict[str, Any]] = N
     user_prompt = f"{user_context}\n\nВопрос: {query}"
 
     messages = [
-        {'role': 'system', 'text': system_prompt},
-        {'role': 'user', 'text': user_prompt},
+        {"role": "system", "text": system_prompt},
+        {"role": "user", "text": user_prompt},
     ]
 
     try:

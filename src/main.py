@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from scalar_fastapi import get_scalar_api_reference
 from starlette.middleware.sessions import SessionMiddleware
 
+from src.api_v1.ai_assistant.routes import ai_assistant_router
 from src.api_v1.ai_matching.routes import ai_matching_router
 from src.api_v1.auth.routes import auth_router
 from src.api_v1.like.routes import likes_router, notifications_router
@@ -18,18 +19,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(root_path="/api/v1", lifespan=lifespan, debug=True)
-app.include_router(
-    users_router
-)
-app.include_router(
-    auth_router
-)
-app.include_router(
-    matches_router
-)
+app.include_router(users_router)
+app.include_router(auth_router)
+app.include_router(matches_router)
 app.include_router(ai_matching_router)
 app.include_router(likes_router)
 app.include_router(notifications_router)
+app.include_router(ai_assistant_router)
 
 app.add_middleware(
     CORSMiddleware,

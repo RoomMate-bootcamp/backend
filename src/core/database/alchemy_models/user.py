@@ -39,8 +39,7 @@ class User(Base):
     study_location: Mapped[str] = mapped_column(nullable=True)
     study_program: Mapped[str] = mapped_column(nullable=True)
     accommodation_preference: Mapped[str] = mapped_column(
-        Enum(AccommodationPreference, native_enum=False),
-        nullable=True
+        Enum(AccommodationPreference, native_enum=False), nullable=True
     )
 
     telegram_username: Mapped[str] = mapped_column(nullable=True)

@@ -9,8 +9,12 @@ async def check_user_exists(username: str) -> bool:
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(
-                    f"{BASE_URL}/auth/register",
-                    json={"username": username, "email": "temp@example.com", "password": "temppass"}
+                f"{BASE_URL}/auth/register",
+                json={
+                    "username": username,
+                    "email": "temp@example.com",
+                    "password": "temppass",
+                },
             ) as response:
                 return response.status == 400
         except Exception:
@@ -21,8 +25,8 @@ async def register_user(username: str, email: str, password: str) -> bool:
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(
-                    f"{BASE_URL}/auth/register",
-                    json={"username": username, "email": email, "password": password}
+                f"{BASE_URL}/auth/register",
+                json={"username": username, "email": email, "password": password},
             ) as response:
                 return response.status == 201
         except Exception:
@@ -59,9 +63,7 @@ async def update_user_profile(token: str, profile_data: Dict[str, Any]) -> bool:
         try:
             headers = {"Authorization": f"Bearer {token}"}
             async with session.put(
-                    f"{BASE_URL}/users/me",
-                    headers=headers,
-                    json=profile_data
+                f"{BASE_URL}/users/me", headers=headers, json=profile_data
             ) as response:
                 return response.status == 200
         except Exception:
