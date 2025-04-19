@@ -11,8 +11,8 @@ from src.core.database.alchemy_models.user import User
 class AIMatchingService:
     def __init__(self):
         self.sdk = YCloudML(
-            folder_id=settings.YANDEX_FOLDER_ID,
-            auth=settings.YANDEX_API_KEY,
+            folder_id=settings.yandex_folder_id,
+            auth=settings.yandex_api_key,
         )
         self.model = self.sdk.models.completions('yandexgpt-lite')
         self.model.configure(
