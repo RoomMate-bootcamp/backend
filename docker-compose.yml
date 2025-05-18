@@ -38,7 +38,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend  # Updated path - one directory up from backend
       dockerfile: Dockerfile
     container_name: dormbuddy-frontend
     restart: always
