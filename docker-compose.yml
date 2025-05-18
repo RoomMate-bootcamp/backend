@@ -1,9 +1,11 @@
+version: '3.8'
+
 services:
   migrations:
     build: .
     command: bash init.sh
     environment:
-      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/postgres-bootcamp
+      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/dormbuddy
     depends_on:
       db:
         condition: service_healthy
@@ -12,33 +14,39 @@ services:
     build: .
     command: runuser -u uvicorn -- /venv/bin/uvicorn src.main:app --app-dir /build --host 0.0.0.0 --port 8010 --workers 2 --loop uvloop
     environment:
-      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/postgres-bootcamp
+      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/dormbuddy
     depends_on:
       migrations:
         condition: service_completed_successfully
     ports:
       - "8010:8010"
     restart: always
+    networks:
+      - dormbuddy-network
+      - default
 
   bot:
     build: .
     command: runuser -u uvicorn -- /venv/bin/python /build/run.py
     environment:
-      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/postgres-bootcamp
+      - DB_URL=postgresql+asyncpg://postgres:72ZGBYhaq+vLjzWtUatsKw==@db:5432/dormbuddy
     depends_on:
       migrations:
         condition: service_completed_successfully
     restart: always
+    networks:
+      - dormbuddy-network
+      - default
 
   db:
     image: postgres:16-alpine
     restart: always
     ports:
-      - "5434:5432"
+      - "5435:5432"  # Changed port to avoid conflict with existing DBs
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=72ZGBYhaq+vLjzWtUatsKw==
-      - POSTGRES_DB=postgres-bootcamp
+      - POSTGRES_DB=dormbuddy
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -46,7 +54,15 @@ services:
       retries: 5
       start_period: 30s
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - dormbuddy-pgdata:/var/lib/postgresql/data
+    networks:
+      - dormbuddy-network
+      - default
+
+networks:
+  dormbuddy-network:
+    external: true
+  default:
 
 volumes:
-  pgdata:
+  dormbuddy-pgdata:
