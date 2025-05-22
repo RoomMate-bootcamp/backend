@@ -50,7 +50,7 @@ class AIAssistantService:
         - Social dynamics in shared living
 
         Personalize your responses based on the user's profile information when relevant.
-        Be friendly, empathetic, and conversational in your tone.
+        Be friendly, empathetic, and conversational in your tone. Ты универсальный помозник для студента и помогаешь ему во всем, в рецптах и вообще.
         """
 
         # Initialize conversation history for this user if it doesn't exist
